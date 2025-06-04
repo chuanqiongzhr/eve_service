@@ -52,9 +52,6 @@ def get_type_ids_from_db():
     return type_ids
 
 def from_ids_get_info(type_ids):
-    # 确保 type_ids 是可迭代对象
-    if isinstance(type_ids, int):
-        type_ids = [type_ids]
     for ids in type_ids:
         url = f'https://esi.evetech.net/latest/universe/types/{ids}/?datasource=tranquility&language=zh'
     response = requests.get(url)

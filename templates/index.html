@@ -4,32 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EVE 工具集</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='1.0') }}">
-    <style>
-        .menu-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 80vh;
-            gap: 20px;
-        }
-        .menu-item {
-            padding: 20px 40px;
-            background-color: #1976d2;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 1.2em;
-            transition: background-color 0.3s;
-        }
-        .menu-item:hover {
-            background-color: #1565c0;
-        }
-    </style>
 </head>
 <body>
-    <div class="menu-container">
-        <a href="/price_history" class="menu-item">价格查询</a>
-    </div>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">EVE 工具集</a>
+            <div class="navbar-menu">
+                <a href="/price_history" class="navbar-item">价格查询</a>
+            </div>
+        </div>
+    </nav>
 </body>
 </html>
