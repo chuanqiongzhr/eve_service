@@ -9,45 +9,6 @@ from tqdm import tqdm
 
 app = Flask(__name__)
 
-def calculate_special_prices(name, max_buy_price, min_sell_price, middle_price):
-    """计算特殊物品的额外价格信息"""
-    special_prices = {}
-
-    # id,chinese_name = name_to_id(name)
-    # info = from_ids_get_info(id)
-    # group_id = info.get('group_id')
-
-    # if group_id == 300:
-    #     if len(search_items(name)) != 1 and len(search_items(name)) == 6:
-    #         max_buy = []
-    #         min_sell = []
-    #         middle = []
-    #         for id, Name in search_items(name):
-    #             buy_sell_data = get_buy_sell_data(id)
-    #             max_buy.appdend(get_max_buy_price_from_data(buy_sell_data,station_id = 60003760))
-    #             min_sell.appdend(get_min_sell_price_from_data(buy_sell_data,station_id = 60003760))
-    #             middle.appdend((float(max_buy) + float(min_sell)) / 2)
-
-    #         special_prices = {
-    #             "max_buy_price_set": round(sum(max_buy) if max_buy else 0, 2),
-    #             "min_sell_price_set": round(sum(min_sell) if min_sell else 0, 2),
-    #             "middle_price_set": round(sum(middle) if middle else 0, 2),
-    #             "unit": "一套"
-    #         }
-
-
-    if name == "伊甸币":
-        # 伊甸币 500个一组
-        special_prices = {
-            "max_buy_price_500": round(max_buy_price * 500, 2) if max_buy_price else None,
-            "min_sell_price_500": round(min_sell_price * 500, 2) if min_sell_price else None,
-            "middle_price_500": round(middle_price * 500, 2) if middle_price else None,
-            "unit": "500个"
-        }
-    # 可以继续添加其他特殊物品
-    
-    return special_prices
-
 # 禁用静态文件缓存
 @app.after_request
 def add_header(response):
