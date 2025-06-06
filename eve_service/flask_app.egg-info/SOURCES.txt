@@ -1,0 +1,16 @@
+README.md
+pyproject.toml
+flask_app.egg-info/PKG-INFO
+flask_app.egg-info/SOURCES.txt
+flask_app.egg-info/dependency_links.txt
+flask_app.egg-info/requires.txt
+flask_app.egg-info/top_level.txt
+scripts/database_init.py
+scripts/download_echarts.py
+scripts/get_buy_sell.py
+scripts/get_icon.py
+scripts/get_price_history.py
+scripts/get_system_id.py
+scripts/region_id_table.py
+scripts/search_items.py
+tests/test_app.py
