@@ -2,7 +2,6 @@ from flask import Flask, render_template, jsonify, request, send_from_directory
 from eve_service.scripts.get_price_history import name_to_id, get_price_history
 from eve_service.scripts.get_icon import get_item_icon
 from eve_service.scripts.get_buy_sell import get_buy_sell_data, get_max_buy_price_from_data, get_min_sell_price_from_data, get_middle_price_from_data
-from eve_service.scripts.database_init import from_ids_get_info
 from eve_service.scripts.search_items import search_items
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -33,11 +32,12 @@ def process_item_data(item_id, item_name, region_id):
     item_price_history = get_price_history(region_id=region_id, type_id=item_id)
     if not item_price_history:
         return None
-        
-    buy_data, sell_data = get_buy_sell_data(item_id)
-    max_buy_price = get_max_buy_price_from_data(buy_data, 60003760)
-    min_sell_price = get_min_sell_price_from_data(sell_data, 60003760)
-    middle_price = get_middle_price_from_data(buy_data, sell_data, 60003760)
+    station_id = 60003760    
+    buy_data, sell_data = get_buy_sell_data(item_id, region_id)
+    
+    max_buy_price = get_max_buy_price_from_data(buy_data, station_id)
+    min_sell_price = get_min_sell_price_from_data(sell_data, station_id)
+    middle_price = get_middle_price_from_data(buy_data, sell_data, station_id)
     
     icon_url = get_item_icon(item_id)
     
@@ -69,7 +69,9 @@ def price_history():
             return jsonify([]), 200  # 如果搜索也没有结果，返回空列表
             
         # 如果有搜索结果，并发处理所有匹配项
+        
         region_id = 10000002
+        station_id = 60003760  
         all_price_history = []
         total_max_buy = 0
         total_min_sell = 0
@@ -107,7 +109,11 @@ def price_history():
         return jsonify(all_price_history)
     
     # 如果直接匹配成功，使用原有逻辑
-    region_id = 10000002
+    if type_id == 44992:
+        region_id = 19000001
+    else:
+        region_id = 10000002
+        station_id = 60003760  
     price_history = get_price_history(region_id=region_id, type_id=type_id)
     
     if not price_history:
@@ -116,12 +122,17 @@ def price_history():
     # 获取icon url
     icon_url = get_item_icon(type_id)
     
-    buy_data, sell_data = get_buy_sell_data(type_id)
+    buy_data, sell_data = get_buy_sell_data(type_id, region_id)
     # 获取买卖价格
-    max_buy_price = get_max_buy_price_from_data(buy_data, 60003760)
-    min_sell_price = get_min_sell_price_from_data(sell_data, 60003760)
-    middle_price = get_middle_price_from_data(buy_data, sell_data, 60003760)
-    
+    if type_id == 44992:
+        max_buy_price = get_max_buy_price_from_data(buy_data)
+        min_sell_price = get_min_sell_price_from_data(sell_data)
+        middle_price = get_middle_price_from_data(buy_data, sell_data)
+    else:
+        max_buy_price = get_max_buy_price_from_data(buy_data, station_id)
+        min_sell_price = get_min_sell_price_from_data(sell_data, station_id)
+        middle_price = get_middle_price_from_data(buy_data, sell_data, station_id)
+
     # 给每条数据加上物品名称和icon url
     for entry in price_history:
         entry['item_name'] = chinese_name
@@ -140,3 +151,4 @@ def price_history():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
+    

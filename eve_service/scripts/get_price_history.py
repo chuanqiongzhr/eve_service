@@ -42,3 +42,4 @@ if __name__ == '__main__':
         print(f"物品 {chinese_name} 的ID为: {type_id}")
     region_id = 10000002  # 伏尔戈
     price_data = get_price_history(type_id, region_id)
+    print(price_data)

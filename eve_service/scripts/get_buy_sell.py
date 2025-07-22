@@ -18,10 +18,9 @@ def fetch_page(url):
     return []
 
 # 添加缓存装饰器
-@lru_cache(maxsize=1000)
-def get_buy_sell_data(item_id):
+def get_buy_sell_data(item_id,region_id = None):
     '''Fetches buy and sell data for a given item ID from the API, with progress bar and multithreading.'''
-    region_id = 10000002  # 伏尔戈
+      # 伏尔戈
     total_pages = get_total_pages(item_id, region_id)
     buy_data = []
     sell_data = []
@@ -38,31 +37,43 @@ def get_buy_sell_data(item_id):
                 sell_data.extend([order for order in data if not order['is_buy_order']])
     return buy_data, sell_data
 
-def get_max_buy_price_from_data(buy_data, station_id):
-    station_orders = [order for order in buy_data if order['location_id'] == station_id]
+def get_max_buy_price_from_data(buy_data, station_id = None):
+    if station_id is not None:
+        # 如果指定了站点ID，则只获取该站点的订单
+        station_orders = [order for order in buy_data if order['location_id'] == station_id]
+    else:
+        # 如果没有指定站点ID，则使用全部订单
+        station_orders = buy_data
     prices = [order['price'] for order in station_orders]
     return max(prices) if prices else None
 
-def get_min_sell_price_from_data(sell_data, station_id):
-    station_orders = [order for order in sell_data if order['location_id'] == station_id]
+def get_min_sell_price_from_data(sell_data, station_id = None):
+    if station_id is not None:
+        # 如果指定了站点ID，则只获取该站点的订单
+        station_orders = [order for order in sell_data if order['location_id'] == station_id]
+    else:
+        # 如果没有指定站点ID，则使用全部订单
+        station_orders = sell_data
     prices = [order['price'] for order in station_orders]
     return min(prices) if prices else None
 
-def get_middle_price_from_data(buy_data, sell_data, station_id):
+def get_middle_price_from_data(buy_data, sell_data, station_id = None):
     max_buy_price = get_max_buy_price_from_data(buy_data, station_id)
     min_sell_price = get_min_sell_price_from_data(sell_data, station_id)
     if max_buy_price is not None and min_sell_price is not None:
         return round((float(max_buy_price) + float(min_sell_price)) / 2, 2)
     return None
 
+
 # Example usage:
 if __name__ == '__main__':
-    item_id = 34  # Example item ID
-    station_id = 60003760  # jita IV - Moon 4 - Caldari Navy Assembly Plant
-    buy_data, sell_data = get_buy_sell_data(item_id)
-    max_buy_price = get_max_buy_price_from_data(buy_data, station_id)
-    min_sell_price = get_min_sell_price_from_data(sell_data, station_id)
-    middle_price = get_middle_price_from_data(buy_data, sell_data, station_id)
+    item_id = 42204  # Example item ID
+    region_id = 10000002  # Example region ID
+    buy_data, sell_data = get_buy_sell_data(item_id,region_id)
+    print("buy_data:", buy_data, flush=True)
+    max_buy_price = get_max_buy_price_from_data(buy_data,)
+    min_sell_price = get_min_sell_price_from_data(sell_data)
+    middle_price = get_middle_price_from_data(buy_data, sell_data)
     print(max_buy_price)
     print(min_sell_price)
     print(middle_price)

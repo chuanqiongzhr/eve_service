@@ -2,24 +2,29 @@
 async function loadChart(name = '伊甸币') {
     console.log('开始加载图表，物品名称:', name);
     
+    // 清空图表和信息
+    if (myChart) {
+        myChart.clear();
+    }
+
     // 显示加载动画
     document.body.classList.add('loading');
     
     try {
-        // 首先尝试从缓存获取数据
-        const cachedData = getCache(name);
-        let data;
-        
-        if (cachedData) {
-            console.log('使用缓存数据');
-            data = cachedData;
-        } else {
-            console.log('从服务器获取数据');
-            data = await fetchPriceHistory(name);
-            if (data && data.length > 0) {
-                // 将数据存入缓存
-                setCache(name, data);
+        // 直接从服务器获取数据，不用缓存
+        let data = await fetchPriceHistory(name);
+
+        console.log('获取到的数据:', data);
+
+        if (!data || data.length === 0) {
+            console.error('没有获取到数据');
+            // 清空图表和信息
+            if (myChart) {
+                myChart.clear();
             }
+            document.getElementById('title-bar').innerHTML = '';
+            document.getElementById('info-bar').innerHTML = '';
+            return;
         }
         
         console.log('获取到的数据:', data);

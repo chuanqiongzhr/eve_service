@@ -11,42 +11,42 @@ function getCacheKey(name) {
     return CACHE_PREFIX + name;
 }
 
-function setCache(name, data) {
-    const cacheData = {
-        timestamp: Date.now(),
-        data: data
-    };
-    try {
-        localStorage.setItem(getCacheKey(name), JSON.stringify(cacheData));
-    } catch (e) {
-        console.warn('缓存存储失败:', e);
-        // 如果存储失败，清理过期缓存后重试
-        clearExpiredCache();
-        try {
-            localStorage.setItem(getCacheKey(name), JSON.stringify(cacheData));
-        } catch (e) {
-            console.error('缓存存储重试失败:', e);
-        }
-    }
-}
+// function setCache(name, data) {
+//     const cacheData = {
+//         timestamp: Date.now(),
+//         data: data
+//     };
+//     try {
+//         localStorage.setItem(getCacheKey(name), JSON.stringify(cacheData));
+//     } catch (e) {
+//         console.warn('缓存存储失败:', e);
+//         // 如果存储失败，清理过期缓存后重试
+//         clearExpiredCache();
+//         try {
+//             localStorage.setItem(getCacheKey(name), JSON.stringify(cacheData));
+//         } catch (e) {
+//             console.error('缓存存储重试失败:', e);
+//         }
+//     }
+// }
 
-function getCache(name) {
-    try {
-        const cacheStr = localStorage.getItem(getCacheKey(name));
-        if (!cacheStr) return null;
+// function getCache(name) {
+//     try {
+//         const cacheStr = localStorage.getItem(getCacheKey(name));
+//         if (!cacheStr) return null;
         
-        const cache = JSON.parse(cacheStr);
-        if (Date.now() - cache.timestamp > CACHE_EXPIRY) {
-            // 缓存已过期，删除它
-            localStorage.removeItem(getCacheKey(name));
-            return null;
-        }
-        return cache.data;
-    } catch (e) {
-        console.warn('缓存读取失败:', e);
-        return null;
-    }
-}
+//         const cache = JSON.parse(cacheStr);
+//         if (Date.now() - cache.timestamp > CACHE_EXPIRY) {
+//             // 缓存已过期，删除它
+//             localStorage.removeItem(getCacheKey(name));
+//             return null;
+//         }
+//         return cache.data;
+//     } catch (e) {
+//         console.warn('缓存读取失败:', e);
+//         return null;
+//     }
+// }
 
 function clearExpiredCache() {
     try {
@@ -265,7 +265,6 @@ function updateChart(data) {
 
 function updateInfoBar(data) {
     let infoHtml = '';
-    
     // 显示每个物品的价格信息
     data.forEach(item => {
         const buy = formatPrice(item.max_buy_price);
