@@ -1,0 +1,1727 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>血袭燃烧</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='1.0') }}">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">EVE 工具集</a>
+            <div class="navbar-menu">
+                <a href="/price_history" class="navbar-item">价格查询</a>
+                <a href="/xuexi_ranshao" class="navbar-item">血袭燃烧</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 用户操作区域 -->
+    <div id="userArea" class="user-area">
+        <!-- 未登录状态 -->
+        <div id="guestArea" class="guest-area">
+            <button id="loginBtn" class="auth-btn login-btn">登录</button>
+            <button id="registerBtn" class="auth-btn register-btn">注册</button>
+        </div>
+
+        <!-- 已登录状态 -->
+        <div id="userProfile" class="user-profile" style="display: none;">
+
+            <div class="user-avatar" id="userAvatar">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E"
+                    alt="用户头像">
+                <span class="username" id="displayUsername"></span>
+                <span class="dropdown-arrow">▼</span>
+            </div>
+            <div class="user-dropdown" id="userDropdown">
+                <div class="dropdown-item user-info">
+                    <div class="user-details">
+                        <div class="user-name" id="dropdownUsername"></div>
+                        <div class="user-level" id="userLevel"></div>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                <!-- 设置比率按钮 -->
+                <button class="dropdown-item settings-item" id="settingsBtnLoggedIn">
+                    <span class="settings-icon">⚙️</span>
+                    设置比率
+                </button>
+                <!-- 更新数据按钮 -->
+                <button class="dropdown-item update-data-item" id="updateDataBtn">
+                    <span class="update-icon">🔄</span>
+                    更新数据
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item logout-btn" id="logoutBtn">
+                    <span class="logout-icon">🚪</span>
+                    退出登录
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main>
+        <!-- 登录弹窗 -->
+        <div id="loginModal" class="modal">
+            <div class="modal-content">
+                <span class="close" id="closeModal">&times;</span>
+                <h2>用户登录</h2>
+                <div class="modal-body">
+                    <form id="loginForm" action="/xuexi_ranshao/login" method="POST">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="rememberMe" name="rememberMe">
+                            <label class="form-check-label" for="rememberMe">记住我（保持登录状态30天）</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">登录</button>
+                    </form>
+                    <div class="switch-form">
+                        <p>还没有账号？<a href="#" id="showRegister">立即注册</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 注册弹窗 -->
+        <div id="registerModal" class="modal">
+            <div class="modal-content">
+                <span class="close" id="closeRegisterModal">&times;</span>
+                <h2>用户注册</h2>
+                <div class="modal-body">
+                    <form id="registerForm" action="/xuexi_ranshao/register" method="POST">
+                        <div class="mb-3">
+                            <label for="regUsername" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="regUsername" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regPassword" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="regPassword" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">确认密码</label>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirmPassword"
+                                required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regEmail" class="form-label">邮箱（可选）</label>
+                            <input type="email" class="form-control" id="regEmail" name="email">
+                        </div>
+                        <button type="submit" class="btn btn-success">注册</button>
+                    </form>
+                    <div class="switch-form">
+                        <p>已有账号？<a href="#" id="showLogin">立即登录</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设置比率弹窗 -->
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <span class="close" id="closeSettingsModal">&times;</span>
+                <h2>设置合作社回收比率</h2>
+                <p>当前比率: <span id="currentRateSpan">2200</span></p>
+                <div class="modal-body">
+                    <form id="settingsForm">
+                        <div class="mb-3">
+                            <label for="cooperativeRate" class="form-label">新比率</label>
+                            <input type="number" step="0.01" class="form-control" id="cooperativeRate" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <button type="button" id="cancelSettings" class="btn btn-secondary">取消</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自定义消息弹窗 -->
+        <div id="messageModal" class="message-modal">
+            <div class="message-content">
+                <div class="message-icon" id="messageIcon"></div>
+                <div class="message-text" id="messageText"></div>
+                <button class="message-btn" id="messageBtn">确定</button>
+            </div>
+        </div>
+
+        <!-- 更新数据弹窗 -->
+        <div id="updateDataModal" class="modal">
+            <div class="modal-content">
+                <span class="close" id="closeUpdateDataModal">&times;</span>
+                <h2>更新血袭合作社数据</h2>
+                <div class="modal-body">
+                    <form id="updateDataForm">
+                        <div class="mb-3">
+                            <label for="updateBloodUsername" class="form-label">血袭合作社用户名</label>
+                            <input type="text" class="form-control" id="updateBloodUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="updateBloodPassword" class="form-label">血袭合作社密码</label>
+                            <input type="password" class="form-control" id="updateBloodPassword" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">获取并更新数据</button>
+                        <button type="button" id="cancelUpdateData" class="btn btn-secondary">取消</button>
+                    </form>
+                    <div id="updateLoadingIndicator" class="loading-indicator" style="display: none;">
+                        <div class="spinner"></div>
+                        <div>正在获取数据，请稍候...</div>
+                    </div>
+                    <!-- 添加更新状态显示区域 -->
+                    <div id="updateStatusDisplay" class="update-status-display" style="display: none;">
+                        <div class="update-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <div class="progress-text" id="progressText">0%</div>
+                        </div>
+                        <div class="update-steps">
+                            <div class="update-step" id="step1">
+                                <div class="step-icon">1</div>
+                                <div class="step-text">验证账户</div>
+                            </div>
+                            <div class="update-step" id="step2">
+                                <div class="step-icon">2</div>
+                                <div class="step-text">获取数据</div>
+                            </div>
+                            <div class="update-step" id="step3">
+                                <div class="step-icon">3</div>
+                                <div class="step-text">保存到数据库</div>
+                            </div>
+                            <div class="update-step" id="step4">
+                                <div class="step-icon">4</div>
+                                <div class="step-text">计算统计信息</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页面内容区域 -->
+        <div class="content-area">
+            <div class="isk-lp-info">
+                <div class="info-card">
+                    <div class="info-label">实时jita ISK/LP 比率</div>
+                    <div class="info-value">{{ max_isk_lp }}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">实时合作社回收 ISK/LP 比率</div>
+                    <div class="info-value">2200</div>
+                </div>
+            </div>
+            
+            <!-- 任务状态信息 -->
+            <div class="mission-status-info">
+                <h3>任务状态统计</h3>
+                <div class="isk-lp-info">  <!-- 复用现有的卡片布局样式 -->
+                    {% if mission_status.completed %}
+                    <div class="info-card">
+                        <div class="info-label">已完成任务</div>
+                        <div class="info-value">{{ mission_status.completed.count }}</div>
+                        <div class="info-bounty">{{ '{:,.0f}'.format(mission_status.completed.total_bounty) }} ISK</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if mission_status.paid %}
+                    <div class="info-card">
+                        <div class="info-label">已支付任务</div>
+                        <div class="info-value">{{ mission_status.paid.count }}</div>
+                        <div class="info-bounty">{{ '{:,.0f}'.format(mission_status.paid.total_bounty) }} ISK</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if mission_status.done %}
+                    <div class="info-card">
+                        <div class="info-label">已完结任务</div>
+                        <div class="info-value">{{ mission_status.done.count }}</div>
+                        <div class="info-bounty">{{ '{:,.0f}'.format(mission_status.done.total_bounty) }} ISK</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+
+        </div>
+    </main>
+
+    <style>
+        .db-save-status {
+            margin: 15px 0;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .db-save-status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border-left: 4px solid #4caf50;
+        }
+
+        .db-save-status.error {
+            background: #ffebee;
+            color: #d32f2f;
+            border-left: 4px solid #f44336;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(90deg, #2e7d32 0%, #81c784 100%) !important;
+        }
+
+        /* 添加取消按钮样式，与设置比率按钮保持一致 */
+        .btn-secondary {
+            background: linear-gradient(135deg, #4caf50, #66bb6a);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 12px;
+            margin-top: 8px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #388e3c, #81c784);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+        }
+        
+        /* 更新状态显示样式 */
+        .update-status-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .update-progress {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-right: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1976d2, #42a5f5);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-weight: bold;
+            color: #1976d2;
+            width: 40px;
+            text-align: right;
+        }
+
+        .update-steps {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .update-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 22%;
+        }
+
+        .step-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #757575;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .step-text {
+            font-size: 0.8em;
+            color: #757575;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .update-step.active .step-icon {
+            background: #1976d2;
+            color: white;
+        }
+
+        .update-step.active .step-text {
+            color: #1976d2;
+            font-weight: bold;
+        }
+
+        .update-step.completed .step-icon {
+            background: #4caf50;
+            color: white;
+        }
+
+        .update-step.completed .step-text {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .update-step.error .step-icon {
+            background: #f44336;
+            color: white;
+        }
+
+        .update-step.error .step-text {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .switch-form {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .settings-item {
+            color: #4caf50;
+            font-weight: 500;
+        }
+
+        .settings-item:hover {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .settings-icon {
+            font-size: 1.1em;
+        }
+
+        .update-data-item {
+            color: #1976d2;
+            font-weight: 500;
+        }
+
+        .update-data-item:hover {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .update-icon {
+            font-size: 1.1em;
+        }
+
+        /* ISK/LP 信息卡片样式 */
+        .isk-lp-info {
+            display: flex;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            border: 2px solid #e3f2fd;
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 200px;
+            flex: 1;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .info-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(25, 118, 210, 0.15);
+            border-color: #1976d2;
+        }
+
+        .info-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .info-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #1976d2;
+            text-shadow: 0 1px 2px rgba(25, 118, 210, 0.1);
+        }
+        
+        .info-bounty {
+            font-size: 1em;
+            color: #388e3c;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        
+        /* 任务状态信息样式 */
+        .mission-status-info {
+            margin: 30px 0;
+        }
+        
+        .mission-status-info h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .info-bounty {
+            font-size: 1em;
+            color: #388e3c;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .isk-lp-info {
+                flex-direction: column;
+            }
+
+            .info-card {
+                min-width: auto;
+            }
+        }
+
+        /* 血袭数据区域样式 */
+        .blood-data-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .blood-data-section h2 {
+            color: #1976d2;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+            display: inline-block;
+            margin-right: 20px;
+        }
+
+        .data-controls {
+            margin-bottom: 25px;
+            display: inline-block;
+            vertical-align: top;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+
+        .credentials-input {
+            display: grid;
+            grid-template-columns: auto 1fr auto 1fr auto;
+            gap: 15px;
+            align-items: center;
+            max-width: 700px;
+        }
+
+        .credentials-input label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .credentials-input input {
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .credentials-input input:focus {
+            border-color: #1976d2;
+            outline: none;
+        }
+
+        .fetch-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            color: white;
+        }
+
+        .fetch-btn:hover {
+            background: linear-gradient(135deg, #1565c0, #64b5f6);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+        }
+
+        .summary-btn {
+            background: linear-gradient(135deg, #388e3c, #66bb6a);
+        }
+
+        .summary-btn:hover {
+            background: linear-gradient(135deg, #2e7d32, #81c784);
+        }
+
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e0e0e0;
+            border-top: 3px solid #1976d2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .data-display {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 200px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .data-placeholder {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+
+        .data-content {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #d32f2f;
+        }
+
+        /* 用户操作区域样式 */
+        .user-area {
+            position: absolute;
+            top: 70px;
+            right: 40px;
+            z-index: 100;
+        }
+
+        /* 未登录状态样式 */
+        .guest-area {
+            display: flex;
+            gap: 12px;
+        }
+
+        .auth-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .login-btn {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            color: white;
+        }
+
+        .login-btn:hover {
+            background: linear-gradient(135deg, #1565c0, #64b5f6);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(25, 118, 210, 0.3);
+        }
+
+        .register-btn {
+            background: white;
+            color: #1976d2;
+            border: 2px solid #1976d2;
+        }
+
+        .register-btn:hover {
+            background: #1976d2;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(25, 118, 210, 0.3);
+        }
+
+        /* 已登录状态样式 */
+        .user-profile {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* 设置按钮样式 */
+        .settings-btn {
+            background: linear-gradient(135deg, #4caf50, #66bb6a);
+            color: white;
+        }
+
+        .settings-btn:hover {
+            background: linear-gradient(135deg, #388e3c, #81c784);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+        }
+
+        .user-avatar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 12px rgba(25, 118, 210, 0.2);
+        }
+
+        .user-avatar:hover {
+            background: linear-gradient(135deg, #1565c0, #64b5f6);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(25, 118, 210, 0.3);
+        }
+
+        .user-avatar img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px;
+        }
+
+        .username {
+            font-weight: 600;
+            font-size: 0.95em;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dropdown-arrow {
+            font-size: 0.8em;
+            transition: transform 0.3s ease;
+        }
+
+        .user-profile.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        /* 下拉菜单样式 */
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            min-width: 220px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .user-profile.active .user-dropdown {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            padding: 12px 16px;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            line-height: 1; /* 添加这一行，统一行高 */
+        }
+
+        .dropdown-item:hover {
+            background: #f5f5f5;
+        }
+
+        .dropdown-item:first-child {
+            border-radius: 12px 12px 0 0;
+        }
+
+        .dropdown-item:last-child {
+            border-radius: 0 0 12px 12px;
+        }
+
+        .user-info {
+            cursor: default;
+            background: #f8f9fa;
+        }
+
+        .user-info:hover {
+            background: #f8f9fa;
+        }
+
+        .user-details {
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 1em;
+        }
+
+        .user-level {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 0;
+        }
+
+        .logout-btn {
+            color: #d32f2f;
+            font-weight: 500;
+        }
+
+        .logout-btn:hover {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .logout-icon {
+            font-size: 1.1em;
+        }
+
+        /* 原有样式保持不变 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.15);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+            animation: simpleModalFadeIn 0.15s ease-out forwards;
+        }
+
+        @keyframes simpleModalFadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background: #fff;
+            margin: auto;
+            padding: 36px 32px 28px 32px;
+            border-radius: 18px;
+            width: 340px;
+            box-shadow: 0 8px 24px rgba(25, 118, 210, 0.12);
+            position: relative;
+            text-align: center;
+            /* 移除内容的单独动画，避免重复动画 */
+            /* animation: modalFadeIn 0.3s; */
+        }
+
+        .close {
+            position: absolute;
+            right: 18px;
+            top: 12px;
+            font-size: 28px;
+            color: #aaa;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close:hover {
+            color: #1976d2;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 24px;
+            color: #1976d2;
+            font-weight: bold;
+            font-size: 1.5em;
+        }
+
+        .modal-content label {
+            display: block;
+            text-align: left;
+            margin-bottom: 6px;
+            color: #333;
+            font-size: 1em;
+        }
+
+        .modal-content input {
+            width: 100%;
+            margin-bottom: 18px;
+            padding: 10px 12px;
+            border: 1.5px solid #bdbdbd;
+            border-radius: 6px;
+            font-size: 1.1em;
+            transition: border 0.2s;
+            box-sizing: border-box;
+        }
+
+        .modal-content input:focus {
+            border: 1.5px solid #1976d2;
+            outline: none;
+        }
+
+        .modal-content button[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(90deg, #1976d2 0%, #42a5f5 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 8px;
+            box-sizing: border-box;
+        }
+
+        .modal-content button[type="submit"]:hover {
+            background: linear-gradient(90deg, #1565c0 0%, #64b5f6 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(90deg, #388e3c 0%, #66bb6a 100%) !important;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(90deg, #2e7d32 0%, #81c784 100%) !important;
+        }
+
+        .switch-form {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .switch-form p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .switch-form a {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.2s;
+        }
+
+        .switch-form a:hover {
+            color: #1565c0;
+            text-decoration: underline;
+        }
+
+        /* 自定义消息弹窗样式 */
+        .message-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .message-modal.show {
+            display: flex;
+            animation: simpleModalFadeIn 0.15s ease-out forwards;
+        }
+
+        .message-content {
+            background: #fff;
+            padding: 32px 28px 24px 28px;
+            border-radius: 16px;
+            width: 320px;
+            max-width: 90vw;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            /* 移除内容的单独动画，避免重复动画 */
+            /* animation: messageModalFadeIn 0.25s; */
+        }
+
+        .message-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .message-icon.success {
+            background: linear-gradient(135deg, #4caf50, #66bb6a);
+            color: #fff;
+        }
+
+        .message-icon.success::before {
+            content: '✓';
+        }
+
+        .message-icon.error {
+            background: linear-gradient(135deg, #f44336, #ef5350);
+            color: #fff;
+        }
+
+        .message-icon.error::before {
+            content: '✕';
+        }
+
+        .message-icon.info {
+            background: linear-gradient(135deg, #2196f3, #42a5f5);
+            color: #fff;
+        }
+
+        .message-icon.info::before {
+            content: 'i';
+        }
+
+        .message-text {
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .message-btn {
+            background: linear-gradient(90deg, #1976d2 0%, #42a5f5 100%);
+            color: #fff;
+            border: none;
+            padding: 10px 32px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 80px;
+        }
+
+        .message-btn:hover {
+            background: linear-gradient(90deg, #1565c0 0%, #64b5f6 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+        }
+
+        /* 内容区域样式 */
+        .content-area {
+            padding: 120px 40px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .content-area h1 {
+            color: #1976d2;
+            margin-bottom: 20px;
+        }
+    </style>
+
+    <script>
+        // DOM 元素
+        const userArea = document.getElementById('userArea');
+        const guestArea = document.getElementById('guestArea');
+        const userProfile = document.getElementById('userProfile');
+        const userAvatar = document.getElementById('userAvatar');
+        const userDropdown = document.getElementById('userDropdown');
+        const displayUsername = document.getElementById('displayUsername');
+        const dropdownUsername = document.getElementById('dropdownUsername');
+        const userLevel = document.getElementById('userLevel');
+
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        
+        // 设置比率相关元素
+        const settingsBtnLoggedIn = document.getElementById('settingsBtnLoggedIn');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsModal = document.getElementById('closeSettingsModal');
+        const settingsForm = document.getElementById('settingsForm');
+        const cancelSettings = document.getElementById('cancelSettings');
+        const cooperativeRateInput = document.getElementById('cooperativeRate');
+        const currentRateSpan = document.getElementById('currentRateSpan');
+
+        const loginModal = document.getElementById('loginModal');
+        const registerModal = document.getElementById('registerModal');
+        const closeModal = document.getElementById('closeModal');
+        const closeRegisterModal = document.getElementById('closeRegisterModal');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const showRegister = document.getElementById('showRegister');
+        const showLogin = document.getElementById('showLogin');
+
+        // 自定义消息弹窗元素
+        const messageModal = document.getElementById('messageModal');
+        const messageIcon = document.getElementById('messageIcon');
+        const messageText = document.getElementById('messageText');
+        const messageBtn = document.getElementById('messageBtn');
+        
+        // 更新数据元素
+        const updateDataBtn = document.getElementById('updateDataBtn');
+        const updateDataModal = document.getElementById('updateDataModal');
+        const closeUpdateDataModal = document.getElementById('closeUpdateDataModal');
+        const updateDataForm = document.getElementById('updateDataForm');
+        const cancelUpdateData = document.getElementById('cancelUpdateData');
+        const updateBloodUsername = document.getElementById('updateBloodUsername');
+        const updateBloodPassword = document.getElementById('updateBloodPassword');
+        const updateLoadingIndicator = document.getElementById('updateLoadingIndicator');
+
+        // 当前用户信息
+        let currentUser = null;
+        // 添加血袭合作社凭据存储
+        let bloodCredentials = {
+            username: '',
+            password: ''
+        };
+        // 添加定时更新的计时器变量
+        let autoUpdateTimer = null;
+
+        // 自定义消息弹窗函数
+        function showMessage(text, type = 'info') {
+            messageText.textContent = text;
+            messageIcon.className = `message-icon ${type}`;
+            messageModal.classList.add('show');
+        }
+
+        // 关闭消息弹窗
+        messageBtn.onclick = () => messageModal.classList.remove('show');
+
+        // 点击消息弹窗外部关闭
+        messageModal.onclick = (event) => {
+            if (event.target === messageModal) {
+                messageModal.classList.remove('show');
+            }
+        };
+
+        // 更新用户界面
+        function updateUserInterface(user = null) {
+            if (user) {
+                currentUser = user;
+                guestArea.style.display = 'none';
+                userProfile.style.display = 'block';
+                displayUsername.textContent = user.username;
+                dropdownUsername.textContent = user.username;
+                userLevel.textContent = `权限等级: ${user.access_level || 'standard'}`;
+                
+                // 重新绑定按钮事件
+                updateDataBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    openUpdateDataModal();
+                };
+                
+                settingsBtnLoggedIn.onclick = function(e) {
+                    e.stopPropagation();
+                    openSettingsModal();
+                };
+            } else {
+                currentUser = null;
+                guestArea.style.display = 'flex';
+                userProfile.style.display = 'none';
+                userProfile.classList.remove('active');
+            }
+        }
+
+        // 检查登录状态
+async function checkAuthStatus() {
+    try {
+        const response = await fetch('/xuexi_ranshao/check_auth');
+        if (response.ok) {
+            const result = await response.json();
+            if (result.authenticated) {
+                updateUserInterface(result.user);
+                
+                // 尝试从本地存储恢复血袭合作社凭据
+                try {
+                    const savedCredentials = localStorage.getItem('bloodCredentials');
+                    if (savedCredentials) {
+                        const parsed = JSON.parse(savedCredentials);
+                        bloodCredentials.username = parsed.username;
+                        bloodCredentials.password = parsed.password;
+                        
+                        // 启动自动更新定时器
+                        startAutoUpdate();
+                    }
+                } catch (e) {
+                    console.error('恢复凭据失败:', e);
+                }
+            } else {
+                updateUserInterface();
+                // 停止自动更新
+                stopAutoUpdate();
+            }
+        } else {
+            updateUserInterface();
+            // 停止自动更新
+            stopAutoUpdate();
+        }
+    } catch (error) {
+        console.error('检查登录状态失败:', error);
+        updateUserInterface();
+        // 停止自动更新
+        stopAutoUpdate();
+    }
+}
+
+        // 页面加载时检查登录状态
+        document.addEventListener('DOMContentLoaded', checkAuthStatus);
+
+        // 用户头像点击事件
+        userAvatar.onclick = (e) => {
+            e.stopPropagation();
+            userProfile.classList.toggle('active');
+        };
+
+
+
+        // 阻止下拉菜单点击事件冒泡，但允许按钮点击
+        userDropdown.onclick = (e) => {
+            e.stopPropagation();
+            // 不阻止默认行为，允许按钮点击事件触发
+        };
+
+        // 退出登录
+        logoutBtn.onclick = async () => {
+            try {
+                const response = await fetch('/xuexi_ranshao/logout', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        showMessage('已成功退出登录', 'success');
+                        updateUserInterface();
+                        
+                        // 清除保存的凭据
+                        bloodCredentials.username = '';
+                        bloodCredentials.password = '';
+                        try {
+                            localStorage.removeItem('bloodCredentials');
+                        } catch (e) {
+                            console.error('清除凭据失败:', e);
+                        }
+                        
+                        // 停止自动更新
+                        stopAutoUpdate();
+                    } else {
+                        showMessage('退出登录失败: ' + result.message, 'error');
+                    }
+                } else {
+                    showMessage('退出登录请求失败', 'error');
+                }
+            } catch (error) {
+                console.error('退出登录出错:', error);
+                showMessage('退出登录出错', 'error');
+            }
+        };
+
+        // 显示登录弹窗
+        loginBtn.onclick = () => {
+            loginModal.classList.add('show');
+            registerModal.classList.remove('show');
+        };
+
+        // 显示注册弹窗
+        registerBtn.onclick = () => {
+            registerModal.classList.add('show');
+            loginModal.classList.remove('show');
+        };
+
+        // 切换到注册弹窗
+        showRegister.onclick = (e) => {
+            e.preventDefault();
+            loginModal.classList.remove('show');
+            registerModal.classList.add('show');
+        };
+
+        // 切换到登录弹窗
+        showLogin.onclick = (e) => {
+            e.preventDefault();
+            registerModal.classList.remove('show');
+            loginModal.classList.add('show');
+        };
+
+        // 关闭登录弹窗
+        closeModal.onclick = () => loginModal.classList.remove('show');
+
+        // 关闭注册弹窗
+        closeRegisterModal.onclick = () => registerModal.classList.remove('show');
+
+        // 点击页面其他地方关闭下拉菜单和弹窗
+        window.onclick = (event) => {
+            // 关闭用户下拉菜单
+            userProfile.classList.remove('active');
+            
+            // 关闭登录和注册弹窗
+            if (event.target === loginModal) {
+                loginModal.classList.remove('show');
+            }
+            if (event.target === registerModal) {
+                registerModal.classList.remove('show');
+            }
+            
+            // 关闭设置比率弹窗
+            if (event.target === settingsModal) {
+                closeSettingsModalFunc();
+            }
+            
+            // 关闭更新数据弹窗
+            if (event.target === updateDataModal) {
+                closeUpdateDataModalFunc();
+            }
+        };
+
+        // 登录表单AJAX提交
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(loginForm);
+            const rememberMe = formData.get('rememberMe') === 'on';
+            
+            try {
+                const response = await fetch('/xuexi_ranshao/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        showMessage('登录成功！', 'success');
+                        loginModal.classList.remove('show');
+                        loginForm.reset();
+                        // 保存血袭合作社凭据（与登录凭据相同）
+                        bloodCredentials.username = formData.get('username');
+                        bloodCredentials.password = formData.get('password');
+                        
+                        // 保存到本地存储
+                        try {
+                            localStorage.setItem('bloodCredentials', JSON.stringify(bloodCredentials));
+                        } catch (e) {
+                            console.error('保存凭据失败:', e);
+                        }
+                        // 更新用户界面
+                        updateUserInterface({
+                            username: result.user,
+                            access_level: result.xuexi_specific_data?.access_level || 'standard'
+                        });
+                        
+                        // 启动自动更新
+                        startAutoUpdate();
+                    } else {
+                        showMessage('登录失败: ' + result.message, 'error');
+                    }
+                } else {
+                    showMessage('登录请求失败，请稍后再试。', 'error');
+                }
+            } catch (error) {
+                console.error('登录请求出错:', error);
+                showMessage('登录请求出错，请稍后再试。', 'error');
+            }
+        });
+
+        // 注册表单AJAX提交
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // 验证密码确认
+            const password = document.getElementById('regPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (password !== confirmPassword) {
+                showMessage('两次输入的密码不一致，请重新输入。', 'error');
+                return;
+            }
+
+            const formData = new FormData(registerForm);
+            try {
+                const response = await fetch('/xuexi_ranshao/register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        showMessage('注册成功！请登录。', 'success');
+                        // 切换到登录弹窗并预填用户名
+                        document.getElementById('username').value = document.getElementById('regUsername').value;
+                        registerModal.classList.remove('show');
+                        loginModal.classList.add('show');
+                        // 清空注册表单
+                        registerForm.reset();
+                    } else {
+                        showMessage('注册失败: ' + result.message, 'error');
+                    }
+                } else {
+                    showMessage('注册请求失败，请稍后再试。', 'error');
+                }
+            } catch (error) {
+                console.error('注册请求出错:', error);
+                showMessage('注册请求出错，请稍后再试。', 'error');
+            }
+        });
+
+
+
+        // 更新数据功能
+        // 打开更新数据弹窗
+        function openUpdateDataModal() {
+            // 如果有保存的凭据，直接开始更新流程
+            if (bloodCredentials.username && bloodCredentials.password) {
+                startDataUpdate(bloodCredentials.username, bloodCredentials.password);
+            } else {
+                // 如果没有保存的凭据，显示提示消息
+                showMessage('无法获取血袭合作社凭据，请重新登录', 'error');
+            }
+        }
+
+        // 关闭更新数据弹窗
+        function closeUpdateDataModalFunc() {
+            updateDataModal.classList.remove('show');
+        }
+
+        // 绑定事件
+        updateDataBtn.onclick = function(e) {
+            e.stopPropagation(); // 阻止冒泡，防止关闭下拉菜单
+            openUpdateDataModal();
+        };
+        closeUpdateDataModal.onclick = closeUpdateDataModalFunc;
+        cancelUpdateData.onclick = closeUpdateDataModalFunc;
+
+
+
+        // 添加新函数处理数据更新
+        async function startDataUpdate(username, password, silent = false) {
+            // 检查登录状态
+            if (!currentUser) {
+                showMessage('请先登录后再更新数据', 'error');
+                return;
+            }
+
+            // 显示加载状态和更新状态区域
+            updateDataModal.classList.add('show');
+            updateDataForm.style.display = 'none';
+            updateLoadingIndicator.style.display = 'flex';
+            const updateStatusDisplay = document.getElementById('updateStatusDisplay');
+            updateStatusDisplay.style.display = 'block';
+            
+            // 重置所有步骤状态
+            resetStepStatus();
+            
+            // 更新进度条为0%
+            updateProgress(0);
+            
+            try {
+                // 第一步：验证账户
+                updateStepStatus('step1', 'active');
+                await simulateDelay(500); // 模拟延迟
+                updateProgress(25);
+                updateStepStatus('step1', 'completed');
+                
+                // 第二步：获取数据
+                updateStepStatus('step2', 'active');
+                await simulateDelay(500); // 模拟延迟
+                
+                const response = await fetch(`/api/blood_cooperatives_data?blood_username=${encodeURIComponent(username)}&blood_password=${encodeURIComponent(password)}`);
+                
+                updateProgress(50);
+                updateStepStatus('step2', 'completed');
+                
+                if (response.ok) {
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // 第三步：保存到数据库
+                        updateStepStatus('step3', 'active');
+                        await simulateDelay(500); // 模拟延迟
+                        updateProgress(75);
+                        updateStepStatus('step3', 'completed');
+                        
+                        // 第四步：计算统计信息
+                        updateStepStatus('step4', 'active');
+                        await simulateDelay(500); // 模拟延迟
+                        updateProgress(100);
+                        updateStepStatus('step4', 'completed');
+                        
+                        showMessage('数据更新成功，页面将刷新以显示最新数据', 'success');
+                        // 延迟1秒后刷新页面，以便用户看到成功消息
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        // 更新失败
+                        updateStepStatus('step2', 'error');
+                        updateProgress(50);
+                        showMessage(`更新数据失败: ${result.message}`, 'error');
+                    }
+                } else {
+                    // 请求失败
+                    updateStepStatus('step2', 'error');
+                    updateProgress(50);
+                    showMessage(`请求失败: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                console.error('更新数据出错:', error);
+                // 更新出错
+                updateStepStatus('step2', 'error');
+                updateProgress(50);
+                showMessage('网络错误，请稍后再试', 'error');
+            } finally {
+                // 隐藏加载状态
+                updateLoadingIndicator.style.display = 'none';
+                // 不要立即关闭弹窗，让用户看到进度
+                // closeUpdateDataModalFunc();
+            }
+        }
+
+        // 处理更新数据表单提交
+        updateDataForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // 检查登录状态
+            if (!currentUser) {
+                showMessage('请先登录后再更新数据', 'error');
+                return;
+            }
+
+            // 检查凭证
+            const username = updateBloodUsername.value.trim();
+            const password = updateBloodPassword.value.trim();
+
+            if (!username || !password) {
+                showMessage('请输入血袭合作社用户名和密码', 'error');
+                return;
+            }
+
+            // 保存凭据以便下次使用
+            bloodCredentials.username = username;
+            bloodCredentials.password = password;
+            
+            // 开始更新流程
+            updateDataForm.style.display = 'none';
+            startDataUpdate(username, password);
+        });
+
+        // 更新进度条
+        function updateProgress(percentage) {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            progressFill.style.width = `${percentage}%`;
+            progressText.textContent = `${percentage}%`;
+        }
+
+        // 更新步骤状态
+        function updateStepStatus(stepId, status) {
+            const step = document.getElementById(stepId);
+            // 移除所有状态类
+            step.classList.remove('active', 'completed', 'error');
+            // 添加新状态
+            step.classList.add(status);
+        }
+
+        // 重置所有步骤状态
+        function resetStepStatus() {
+            const steps = ['step1', 'step2', 'step3', 'step4'];
+            steps.forEach(stepId => {
+                const step = document.getElementById(stepId);
+                step.classList.remove('active', 'completed', 'error');
+            });
+        }
+
+        // 模拟延迟
+        function simulateDelay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // 自动更新功能
+        function startAutoUpdate() {
+            // 清除现有的定时器（如果有）
+            stopAutoUpdate();
+            
+            // 设置新的定时器，每小时自动更新一次
+            autoUpdateTimer = setInterval(() => {
+                // 检查是否有保存的凭据
+                if (bloodCredentials.username && bloodCredentials.password) {
+                    // 静默更新数据
+                    startDataUpdate(bloodCredentials.username, bloodCredentials.password, true);
+                }
+            }, 60 * 60 * 1000); // 60分钟 * 60秒 * 1000毫秒
+            
+            console.log('自动更新已启动');
+        }
+        
+        // 停止自动更新
+        function stopAutoUpdate() {
+            if (autoUpdateTimer) {
+                clearInterval(autoUpdateTimer);
+                autoUpdateTimer = null;
+                console.log('自动更新已停止');
+            }
+        }
+
+        // 打开设置弹窗
+        function openSettingsModal() {
+            settingsModal.classList.add('show');
+            cooperativeRateInput.value = '';
+            cooperativeRateInput.focus();
+        }
+
+        // 关闭设置弹窗
+        function closeSettingsModalFunc() {
+            settingsModal.classList.remove('show');
+        }
+
+        // 绑定事件
+        settingsBtnLoggedIn.onclick = function(e) {
+            e.stopPropagation(); // 阻止冒泡，防止关闭下拉菜单
+            openSettingsModal();
+        };
+        closeSettingsModal.onclick = closeSettingsModalFunc;
+        cancelSettings.onclick = closeSettingsModalFunc;
+
+
+
+        // 处理表单提交
+        settingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const newRate = parseFloat(cooperativeRateInput.value);
+
+            if (isNaN(newRate) || newRate <= 0) {
+                showMessage('请输入有效的比率数值', 'error');
+                return;
+            }
+
+            // 更新显示的比率
+            const infoCards = document.querySelectorAll('.info-card');
+            if (infoCards.length > 1) {
+                const cooperativeCard = infoCards[1].querySelector('.info-value');
+                if (cooperativeCard) {
+                    cooperativeCard.textContent = newRate;
+                }
+            }
+
+            // 更新当前比率显示
+            currentRateSpan.textContent = newRate;
+
+            // 保存到本地存储
+            localStorage.setItem('cooperativeRate', newRate);
+
+            showMessage('合作社比率设置成功', 'success');
+            closeSettingsModalFunc();
+        });
+
+        // 页面加载时恢复保存的比率
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedRate = localStorage.getItem('cooperativeRate');
+            if (savedRate) {
+                const infoCards = document.querySelectorAll('.info-card');
+                if (infoCards.length > 1) {
+                    const cooperativeCard = infoCards[1].querySelector('.info-value');
+                    if (cooperativeCard) {
+                        cooperativeCard.textContent = savedRate;
+                    }
+                }
+                currentRateSpan.textContent = savedRate;
+            }
+        });
+
+    </script>
+</body>
+
+</html>

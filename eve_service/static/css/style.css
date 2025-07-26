@@ -284,3 +284,25 @@ body {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
+
+/* 记住我复选框样式 */
+.form-check {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.form-check-input {
+    margin-right: 8px;
+    width: 13px !important; /* 强制应用宽度 */
+    height: 13px !important; /* 保持宽高一致 */
+    min-width: 13px !important; /* 防止被其他样式覆盖 */
+    max-width: 13px !important; /* 确保不会超过指定宽度 */
+    box-sizing: content-box; /* 确保宽度计算不包括边框和内边距 */
+    position: relative;
+    top: 5px; /* 向下移动复选框以与文字对齐 */
+}
+
+.form-check-label {
+    margin-bottom: 0;
+}
