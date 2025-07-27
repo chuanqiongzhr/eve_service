@@ -210,11 +210,13 @@
         <!-- 页面内容区域 -->
         <div class="content-area">
             <div class="isk-lp-info">
-                <div class="info-card">
-                    <div class="info-label">实时jita ISK/LP 比率</div>
-                    <div class="info-value">{{ max_isk_lp }}</div>
-                </div>
-                <div class="info-card">
+                <a href="https://www.fuzzwork.co.uk/lpstore/buy/10000002/1000134" class="info-card-link" target="_blank" rel="noopener noreferrer">
+                    <div class="info-card clickable">
+                        <div class="info-label">实时jita ISK/LP 比率</div>
+                        <div class="info-value">{{ max_isk_lp }}</div>
+                    </div>
+                </a>
+                <div class="info-card clickable" onclick="openSettingsModal()">
                     <div class="info-label">实时合作社回收 ISK/LP 比率</div>
                     <div class="info-value">2200</div>
                 </div>
@@ -443,6 +445,13 @@
             flex-wrap: wrap;
         }
 
+        .info-card-link {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            flex: 1;
+        }
+
         .info-card {
             background: linear-gradient(135deg, #ffffff, #f8f9fa);
             border: 2px solid #e3f2fd;
@@ -459,6 +468,22 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(25, 118, 210, 0.15);
             border-color: #1976d2;
+        }
+
+        .info-card.clickable {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .info-card.clickable:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(25, 118, 210, 0.2);
+            border-color: #1976d2;
+            background: linear-gradient(135deg, #f8f9fa, #e3f2fd);
+        }
+
+        .info-card.clickable:active {
+            transform: translateY(-2px);
         }
 
         .info-label {
@@ -1186,6 +1211,55 @@
             }
         };
 
+        // 添加会话保活功能
+        let sessionKeepAliveTimer = null;
+
+        function startSessionKeepAlive() {
+            // 清除现有定时器
+            if (sessionKeepAliveTimer) {
+                clearInterval(sessionKeepAliveTimer);
+            }
+            
+            // 每3分钟发送一次保活请求
+            sessionKeepAliveTimer = setInterval(async () => {
+                try {
+                    console.log('🔄 执行会话保活检查');
+                    const response = await fetch('/xuexi_ranshao/check_auth', {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.authenticated) {
+                            console.log('✅ 会话保活成功');
+                        } else {
+                            console.warn('⚠️ 会话已失效，停止保活');
+                            stopSessionKeepAlive();
+                            updateUserInterface(); // 切换到未登录状态
+                        }
+                    } else {
+                        console.warn('⚠️ 会话保活请求失败');
+                    }
+                } catch (error) {
+                    console.error('❌ 会话保活异常:', error);
+                }
+            }, 3 * 60 * 1000); // 3分钟
+            
+            console.log('🔄 会话保活已启动');
+        }
+
+        function stopSessionKeepAlive() {
+            if (sessionKeepAliveTimer) {
+                clearInterval(sessionKeepAliveTimer);
+                sessionKeepAliveTimer = null;
+                console.log('🛑 会话保活已停止');
+            }
+        }
+
         // 更新用户界面
         function updateUserInterface(user = null) {
             if (user) {
@@ -1206,51 +1280,120 @@
                     e.stopPropagation();
                     openSettingsModal();
                 };
+                
+                // 启动会话保活
+                startSessionKeepAlive();
             } else {
                 currentUser = null;
                 guestArea.style.display = 'flex';
                 userProfile.style.display = 'none';
                 userProfile.classList.remove('active');
+                // 停止会话保活
+                stopSessionKeepAlive();
             }
         }
 
-        // 检查登录状态
-async function checkAuthStatus() {
+        // 检查登录状态（带重试机制和详细调试信息）
+async function checkAuthStatus(retryCount = 0) {
+    console.log(`🔍 [checkAuthStatus] 开始检查登录状态，重试次数: ${retryCount}`);
+    
     try {
-        const response = await fetch('/xuexi_ranshao/check_auth');
+        // 🔑 强制刷新页面cookies
+        if (retryCount === 0) {
+            console.log('🔄 [checkAuthStatus] 首次检查，等待cookies加载');
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        console.log(`📡 [checkAuthStatus] 发送请求到: /xuexi_ranshao/check_auth`);
+        const response = await fetch('/xuexi_ranshao/check_auth', {
+            method: 'GET',
+            credentials: 'same-origin',  // 🔑 确保包含cookies
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'  // 强制不使用缓存
+            }
+        });
+        
+        console.log(`📥 [checkAuthStatus] 收到响应:`, {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+        
         if (response.ok) {
             const result = await response.json();
+            console.log(`✅ [checkAuthStatus] 解析JSON成功:`, result);
+            
             if (result.authenticated) {
-                updateUserInterface(result.user);
-                
-                // 尝试从本地存储恢复血袭合作社凭据
-                try {
-                    const savedCredentials = localStorage.getItem('bloodCredentials');
-                    if (savedCredentials) {
-                        const parsed = JSON.parse(savedCredentials);
-                        bloodCredentials.username = parsed.username;
-                        bloodCredentials.password = parsed.password;
+                    console.log(`🎉 [checkAuthStatus] 用户已认证:`, result.user);
+                    updateUserInterface(result.user);
+                    
+                    // 尝试从本地存储恢复血袭合作社凭据
+                    try {
+                        const savedCredentials = localStorage.getItem('bloodCredentials');
+                        console.log(`💾 [checkAuthStatus] 本地存储的凭据:`, savedCredentials ? '存在' : '不存在');
                         
-                        // 启动自动更新定时器
-                        startAutoUpdate();
+                        if (savedCredentials) {
+                            const parsed = JSON.parse(savedCredentials);
+                            console.log(`🔑 [checkAuthStatus] 解析凭据成功:`, {
+                                hasUsername: !!parsed.username,
+                                hasPassword: !!parsed.password
+                            });
+                            
+                            bloodCredentials.username = parsed.username;
+                            bloodCredentials.password = parsed.password;
+                            
+                            // 启动自动更新定时器
+                            startAutoUpdate();
+                        }
+                    } catch (e) {
+                        console.error('❌ [checkAuthStatus] 恢复凭据失败:', e);
                     }
-                } catch (e) {
-                    console.error('恢复凭据失败:', e);
+                } else {
+                console.log(`❌ [checkAuthStatus] 用户未认证，重试次数: ${retryCount}`);
+                
+                // 如果认证失败且重试次数少于3次，则重试
+                if (retryCount < 3) {
+                    console.log(`🔄 [checkAuthStatus] ${retryCount + 1}秒后重试...`);
+                    setTimeout(() => checkAuthStatus(retryCount + 1), 1000);
+                    return;
                 }
-            } else {
+                console.log(`🚫 [checkAuthStatus] 达到最大重试次数，停止重试`);
                 updateUserInterface();
-                // 停止自动更新
                 stopAutoUpdate();
             }
         } else {
+            console.error(`❌ [checkAuthStatus] HTTP错误:`, {
+                status: response.status,
+                statusText: response.statusText
+            });
+            
+            // 网络错误也进行重试
+            if (retryCount < 3) {
+                console.log(`🔄 [checkAuthStatus] 网络错误，${retryCount + 1}秒后重试...`);
+                setTimeout(() => checkAuthStatus(retryCount + 1), 1000);
+                return;
+            }
+            console.log(`🚫 [checkAuthStatus] 网络错误达到最大重试次数`);
             updateUserInterface();
-            // 停止自动更新
             stopAutoUpdate();
         }
     } catch (error) {
-        console.error('检查登录状态失败:', error);
+        console.error('💥 [checkAuthStatus] 请求异常:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
+        
+        if (retryCount < 3) {
+            console.log(`🔄 [checkAuthStatus] 异常后重试，${retryCount + 1}秒后重试...`);
+            setTimeout(() => checkAuthStatus(retryCount + 1), 1000);
+            return;
+        }
+        console.log(`🚫 [checkAuthStatus] 异常达到最大重试次数`);
         updateUserInterface();
-        // 停止自动更新
         stopAutoUpdate();
     }
 }
@@ -1272,38 +1415,62 @@ async function checkAuthStatus() {
             // 不阻止默认行为，允许按钮点击事件触发
         };
 
-        // 退出登录
+        // 退出登录（添加调试信息）
         logoutBtn.onclick = async () => {
+            console.log(`🚪 [logout] 开始退出登录流程`);
+            
             try {
+                console.log(`📡 [logout] 发送退出请求到: /xuexi_ranshao/logout`);
                 const response = await fetch('/xuexi_ranshao/logout', {
                     method: 'POST'
                 });
 
+                console.log(`📥 [logout] 收到退出响应:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+
                 if (response.ok) {
                     const result = await response.json();
+                    console.log(`✅ [logout] 退出响应JSON:`, result);
+                    
                     if (result.success) {
+                        console.log(`🎉 [logout] 退出成功`);
                         showMessage('已成功退出登录', 'success');
                         updateUserInterface();
                         
                         // 清除保存的凭据
+                        console.log(`🗑️ [logout] 清除本地凭据`);
                         bloodCredentials.username = '';
                         bloodCredentials.password = '';
                         try {
                             localStorage.removeItem('bloodCredentials');
+                            console.log(`✅ [logout] 本地凭据清除成功`);
                         } catch (e) {
-                            console.error('清除凭据失败:', e);
+                            console.error('❌ [logout] 清除凭据失败:', e);
                         }
                         
                         // 停止自动更新
                         stopAutoUpdate();
                     } else {
+                        console.error(`❌ [logout] 退出失败:`, result.message);
                         showMessage('退出登录失败: ' + result.message, 'error');
                     }
                 } else {
+                    console.error(`❌ [logout] 退出请求HTTP错误:`, {
+                        status: response.status,
+                        statusText: response.statusText
+                    });
                     showMessage('退出登录请求失败', 'error');
                 }
             } catch (error) {
-                console.error('退出登录出错:', error);
+                console.error('💥 [logout] 退出请求异常:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
                 showMessage('退出登录出错', 'error');
             }
         };
@@ -1364,51 +1531,108 @@ async function checkAuthStatus() {
             }
         };
 
-        // 登录表单AJAX提交
+        // 登录表单AJAX提交（添加调试信息）
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            console.log(`🔐 [login] 开始登录流程`);
 
             const formData = new FormData(loginForm);
             const rememberMe = formData.get('rememberMe') === 'on';
             
+            console.log(`📝 [login] 表单数据:`, {
+                username: formData.get('username'),
+                hasPassword: !!formData.get('password'),
+                rememberMe: rememberMe
+            });
+            
             try {
+                console.log('📡 [login] 发送登录请求');
                 const response = await fetch('/xuexi_ranshao/login', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    credentials: 'same-origin',  // 确保包含cookies
+                    // 不要设置Content-Type，让浏览器自动处理FormData
+                });
+                
+                console.log('📥 [login] 收到登录响应:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
                 });
 
                 if (response.ok) {
                     const result = await response.json();
+                    console.log('✅ [login] 登录响应JSON:', result);
+                    
                     if (result.success) {
+                        console.log('🎉 [login] 登录成功:', result.user);
                         showMessage('登录成功！', 'success');
                         loginModal.classList.remove('show');
                         loginForm.reset();
+                        
                         // 保存血袭合作社凭据（与登录凭据相同）
                         bloodCredentials.username = formData.get('username');
                         bloodCredentials.password = formData.get('password');
                         
+                        console.log(`💾 [login] 保存凭据到本地存储`);
                         // 保存到本地存储
                         try {
                             localStorage.setItem('bloodCredentials', JSON.stringify(bloodCredentials));
+                            console.log(`✅ [login] 凭据保存成功`);
                         } catch (e) {
-                            console.error('保存凭据失败:', e);
+                            console.error('❌ [login] 保存凭据失败:', e);
                         }
+                        
                         // 更新用户界面
                         updateUserInterface({
                             username: result.user,
                             access_level: result.xuexi_specific_data?.access_level || 'standard'
                         });
                         
-                        // 启动自动更新
-                        startAutoUpdate();
+                        // 🔑 关键：等待会话完全建立后再进行后续操作
+                        console.log('⏳ [login] 等待会话建立...');
+                        setTimeout(async () => {
+                            console.log('🔄 [login] 验证会话是否建立成功');
+                            try {
+                                const authCheck = await fetch('/xuexi_ranshao/check_auth', {
+                                    method: 'GET',
+                                    credentials: 'same-origin',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Cache-Control': 'no-cache'
+                                    }
+                                });
+                                
+                                if (authCheck.ok) {
+                                    const authResult = await authCheck.json();
+                                    if (authResult.authenticated) {
+                                        console.log('✅ [login] 会话验证成功，启动自动更新');
+                                        startAutoUpdate();
+                                    } else {
+                                        console.error('❌ [login] 会话验证失败');
+                                        showMessage('会话建立失败，请重新登录', 'error');
+                                    }
+                                } else {
+                                    console.error('❌ [login] 会话验证请求失败');
+                                }
+                            } catch (error) {
+                                console.error('💥 [login] 会话验证异常:', error);
+                            }
+                        }, 2000); // 等待2秒确保会话完全建立
                     } else {
+                        console.error('❌ [login] 登录失败:', result.message);
                         showMessage('登录失败: ' + result.message, 'error');
                     }
                 } else {
+                    console.error('❌ [login] 登录请求HTTP错误:', {
+                        status: response.status,
+                        statusText: response.statusText
+                    });
                     showMessage('登录请求失败，请稍后再试。', 'error');
                 }
             } catch (error) {
-                console.error('登录请求出错:', error);
+                console.error('💥 [login] 登录请求异常:', error);
                 showMessage('登录请求出错，请稍后再试。', 'error');
             }
         });
@@ -1484,11 +1708,48 @@ async function checkAuthStatus() {
 
 
 
-        // 添加新函数处理数据更新
+        // 添加新函数处理数据更新（修复会话传递问题）
         async function startDataUpdate(username, password, silent = false) {
+            console.log(`🔄 [startDataUpdate] 开始数据更新流程`);
+            
             // 检查登录状态
             if (!currentUser) {
+                console.error(`❌ [startDataUpdate] 用户未登录`);
                 showMessage('请先登录后再更新数据', 'error');
+                return;
+            }
+
+            // 🔑 强制重新验证会话状态
+            console.log(`🔍 [startDataUpdate] 验证会话状态`);
+            try {
+                const authResponse = await fetch('/xuexi_ranshao/check_auth', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (!authResponse.ok) {
+                    console.error(`❌ [startDataUpdate] 会话验证请求失败: ${authResponse.status}`);
+                    showMessage('会话验证失败，请重新登录', 'error');
+                    updateUserInterface(); // 切换到未登录状态
+                    return;
+                }
+                
+                const authResult = await authResponse.json();
+                if (!authResult.authenticated) {
+                    console.error(`❌ [startDataUpdate] 会话验证失败，用户未认证`);
+                    showMessage('会话已过期，请重新登录', 'error');
+                    updateUserInterface(); // 切换到未登录状态
+                    return;
+                }
+                
+                console.log(`✅ [startDataUpdate] 会话验证成功，用户: ${authResult.user}`);
+            } catch (error) {
+                console.error(`💥 [startDataUpdate] 会话验证异常:`, error);
+                showMessage('会话验证出错，请重新登录', 'error');
                 return;
             }
 
@@ -1507,64 +1768,107 @@ async function checkAuthStatus() {
             
             try {
                 // 第一步：验证账户
+                console.log(`1️⃣ [startDataUpdate] 步骤1: 验证账户`);
                 updateStepStatus('step1', 'active');
-                await simulateDelay(500); // 模拟延迟
+                await simulateDelay(500);
                 updateProgress(25);
                 updateStepStatus('step1', 'completed');
                 
                 // 第二步：获取数据
+                console.log(`2️⃣ [startDataUpdate] 步骤2: 获取数据`);
                 updateStepStatus('step2', 'active');
-                await simulateDelay(500); // 模拟延迟
+                await simulateDelay(500);
                 
-                const response = await fetch(`/api/blood_cooperatives_data?blood_username=${encodeURIComponent(username)}&blood_password=${encodeURIComponent(password)}`);
+                const apiUrl = `/api/blood_cooperatives_data?blood_username=${encodeURIComponent(username)}&blood_password=${encodeURIComponent(password)}`;
+                console.log(`📡 [startDataUpdate] 发送数据请求到:`, apiUrl);
+                
+                // 🔑 关键修复：确保包含会话凭据
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    credentials: 'same-origin',  // 确保包含cookies
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                console.log(`📥 [startDataUpdate] 收到数据响应:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
                 
                 updateProgress(50);
                 updateStepStatus('step2', 'completed');
                 
                 if (response.ok) {
                     const result = await response.json();
+                    console.log(`✅ [startDataUpdate] 数据响应JSON:`, result);
 
                     if (result.success) {
                         // 第三步：保存到数据库
+                        console.log(`3️⃣ [startDataUpdate] 步骤3: 保存到数据库`);
                         updateStepStatus('step3', 'active');
-                        await simulateDelay(500); // 模拟延迟
+                        await simulateDelay(500);
                         updateProgress(75);
                         updateStepStatus('step3', 'completed');
                         
                         // 第四步：计算统计信息
+                        console.log(`4️⃣ [startDataUpdate] 步骤4: 计算统计信息`);
                         updateStepStatus('step4', 'active');
-                        await simulateDelay(500); // 模拟延迟
+                        await simulateDelay(500);
                         updateProgress(100);
                         updateStepStatus('step4', 'completed');
                         
-                        showMessage('数据更新成功，页面将刷新以显示最新数据', 'success');
-                        // 延迟1秒后刷新页面，以便用户看到成功消息
+                        console.log(`🎉 [startDataUpdate] 数据更新成功`);
+                        showMessage('数据更新成功！', 'success');
+                        
+                        // 关闭更新弹窗
                         setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
+                            closeUpdateDataModalFunc();
+                        }, 2000);
+                        
+                        // 可选：动态更新页面上的统计数据
+                        if (result.data && result.data.summary) {
+                            updatePageStatistics(result.data.summary);
+                        }
                     } else {
-                        // 更新失败
+                        console.error(`❌ [startDataUpdate] 数据更新失败:`, result.message);
                         updateStepStatus('step2', 'error');
                         updateProgress(50);
                         showMessage(`更新数据失败: ${result.message}`, 'error');
                     }
                 } else {
-                    // 请求失败
+                    console.error(`❌ [startDataUpdate] 数据请求HTTP错误:`, {
+                        status: response.status,
+                        statusText: response.statusText
+                    });
                     updateStepStatus('step2', 'error');
                     updateProgress(50);
-                    showMessage(`请求失败: ${response.status}`, 'error');
+                    
+                    // 🔍 针对401错误的特殊处理
+                    if (response.status === 401) {
+                        console.log(`🔄 [startDataUpdate] 检测到401错误，尝试重新验证登录状态`);
+                        // 重新检查登录状态
+                        await checkAuthStatus();
+                        showMessage('会话已过期，请重新登录', 'error');
+                    } else {
+                        showMessage(`请求失败: ${response.status}`, 'error');
+                    }
                 }
             } catch (error) {
-                console.error('更新数据出错:', error);
-                // 更新出错
+                console.error('💥 [startDataUpdate] 数据更新异常:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
                 updateStepStatus('step2', 'error');
                 updateProgress(50);
                 showMessage('网络错误，请稍后再试', 'error');
             } finally {
-                // 隐藏加载状态
                 updateLoadingIndicator.style.display = 'none';
-                // 不要立即关闭弹窗，让用户看到进度
-                // closeUpdateDataModalFunc();
+                console.log(`🏁 [startDataUpdate] 数据更新流程结束`);
             }
         }
 
@@ -1627,6 +1931,74 @@ async function checkAuthStatus() {
         function simulateDelay(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
+        
+        // 更新页面统计信息
+        // 更新页面统计信息
+        async function updatePageStatistics(summary) {
+            console.log('📊 [updatePageStatistics] 更新页面统计信息:', summary);
+            
+            try {
+                // 获取最新的任务状态统计信息
+                const response = await fetch('/api/mission_status_summary', {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        const missionStatus = result.data;
+                        
+                        // 更新任务状态统计信息
+                        const missionStatusCards = document.querySelectorAll('.mission-status-info .info-card');
+                        
+                        // 更新已完成任务
+                        if (missionStatus.completed && missionStatusCards[0]) {
+                            const countElement = missionStatusCards[0].querySelector('.info-value');
+                            const bountyElement = missionStatusCards[0].querySelector('.info-bounty');
+                            if (countElement) countElement.textContent = missionStatus.completed.count;
+                            if (bountyElement) {
+                                bountyElement.textContent = new Intl.NumberFormat('zh-CN').format(missionStatus.completed.total_bounty) + ' ISK';
+                            }
+                        }
+                        
+                        // 更新已支付任务
+                        if (missionStatus.paid && missionStatusCards[1]) {
+                            const countElement = missionStatusCards[1].querySelector('.info-value');
+                            const bountyElement = missionStatusCards[1].querySelector('.info-bounty');
+                            if (countElement) countElement.textContent = missionStatus.paid.count;
+                            if (bountyElement) {
+                                bountyElement.textContent = new Intl.NumberFormat('zh-CN').format(missionStatus.paid.total_bounty) + ' ISK';
+                            }
+                        }
+                        
+                        // 更新已完结任务
+                        if (missionStatus.done && missionStatusCards[2]) {
+                            const countElement = missionStatusCards[2].querySelector('.info-value');
+                            const bountyElement = missionStatusCards[2].querySelector('.info-bounty');
+                            if (countElement) countElement.textContent = missionStatus.done.count;
+                            if (bountyElement) {
+                                bountyElement.textContent = new Intl.NumberFormat('zh-CN').format(missionStatus.done.total_bounty) + ' ISK';
+                            }
+                        }
+                        
+                        console.log('✅ [updatePageStatistics] 任务状态统计信息更新完成');
+                    } else {
+                        console.log('⚠️ [updatePageStatistics] 获取任务状态统计信息失败:', result.message);
+                    }
+                } else {
+                    console.log('⚠️ [updatePageStatistics] 任务状态统计信息请求失败:', response.status);
+                }
+                
+            } catch (error) {
+                console.error('❌ [updatePageStatistics] 更新统计信息时出错:', error);
+            }
+        }
+       
         
         // 自动更新功能
         function startAutoUpdate() {

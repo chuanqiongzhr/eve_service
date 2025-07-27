@@ -1,0 +1,25 @@
+[Unit]
+Description=EVE Service Flask Application
+After=network.target
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/var/www/eve_service
+Environment=PATH=/var/www/eve_service/.venv/bin
+Environment=SECRET_KEY=971027c9aec33d334eeef5c9238b245e9dad7a5567b39771b9fa35b5bc81e9f4
+ExecStart=/var/www/eve_service/.venv/bin/gunicorn -c eve_service/gunicorn_config.py eve_service.app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=5
+
+# 日志配置
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eve_service
+
+[Install]
+WantedBy=multi-user.target

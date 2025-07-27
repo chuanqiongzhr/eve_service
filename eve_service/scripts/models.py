@@ -173,60 +173,105 @@ class UserManager:
             conn.close()
     
     def create_session(self, user_id, remember_me=False):
-        """创建用户会话"""
+        """创建用户会话 - 增强版"""
         session_id = secrets.token_urlsafe(32)
         
         # 根据记住我选项设置不同的过期时间
         if remember_me:
-            # 设置30天的过期时间
             expires_at = datetime.now() + timedelta(days=30)
         else:
-            # 默认24小时过期
             expires_at = datetime.now() + timedelta(hours=24)
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute('''
-            INSERT INTO user_sessions (session_id, user_id, expires_at)
-            VALUES (?, ?, ?)
-        ''', (session_id, user_id, expires_at.isoformat()))
-        
-        conn.commit()
-        conn.close()
-        
-        return session_id
+        try:
+            # 先清理该用户的旧会话
+            cursor.execute('''
+                UPDATE user_sessions 
+                SET is_active = 0 
+                WHERE user_id = ? AND is_active = 1
+            ''', (user_id,))
+            
+            # 插入新会话
+            cursor.execute('''
+                INSERT INTO user_sessions (session_id, user_id, expires_at, is_active)
+                VALUES (?, ?, ?, 1)
+            ''', (session_id, user_id, expires_at.isoformat()))
+            
+            conn.commit()
+            
+            # 验证插入是否成功
+            cursor.execute('''
+                SELECT session_id FROM user_sessions 
+                WHERE session_id = ? AND is_active = 1
+            ''', (session_id,))
+            
+            if cursor.fetchone():
+                print(f"✅ Session创建成功: {session_id}")
+                return session_id
+            else:
+                print(f"❌ Session创建失败")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Session创建异常: {str(e)}")
+            conn.rollback()
+            return None
+        finally:
+            conn.close()
     
     def validate_session(self, session_id):
-        """验证会话"""
+        """验证会话 - 增强版"""
+        if not session_id:
+            return None
+            
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT u.id, u.username, u.access_level, s.expires_at
-            FROM user_sessions s
-            JOIN users u ON s.user_id = u.id
-            WHERE s.session_id = ? AND s.is_active = 1
-        ''', (session_id,))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if not result:
+        try:
+            # 清理过期会话
+            cursor.execute('''
+                UPDATE user_sessions
+                SET is_active = 0
+                WHERE expires_at < ? AND is_active = 1
+            ''', (datetime.now().isoformat(),))
+            conn.commit()
+            
+            # 查询有效会话
+            cursor.execute('''
+                SELECT u.id, u.username, u.access_level, s.expires_at, s.created_at
+                FROM user_sessions s
+                JOIN users u ON s.user_id = u.id
+                WHERE s.session_id = ? AND s.is_active = 1
+            ''', (session_id,))
+            
+            result = cursor.fetchone()
+            
+            if not result:
+                print(f"❌ Session验证失败: {session_id}")
+                return None
+                
+            user_id, username, access_level, expires_at, created_at = result
+            expires_time = datetime.fromisoformat(expires_at)
+            
+            if datetime.now() > expires_time:
+                print(f"❌ Session已过期: {session_id}")
+                self.invalidate_session(session_id)
+                return None
+                
+            print(f"✅ Session验证成功: {session_id} -> {username}")
+            return {
+                'id': user_id,
+                'username': username,
+                'access_level': access_level
+            }
+            
+        except Exception as e:
+            print(f"❌ Session验证异常: {str(e)}")
             return None
-        
-        user_id, username, access_level, expires_at = result
-        expires_time = datetime.fromisoformat(expires_at)
-        
-        if datetime.now() > expires_time:
-            self.invalidate_session(session_id)
-            return None
-        
-        return {
-            'id': user_id,
-            'username': username,
-            'access_level': access_level
-        }
+        finally:
+            conn.close()
     
     def invalidate_session(self, session_id):
         """使会话失效"""

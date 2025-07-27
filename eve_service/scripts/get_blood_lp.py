@@ -210,9 +210,12 @@ def save_blood_data_to_db(user_id, username, data):
             conn.close()
 
 
-def get_mission_status_summary():
+def get_mission_status_summary(user_id=None):
     """
     从数据库中获取任务状态统计信息
+    
+    参数:
+    - user_id: 用户ID，如果提供则只统计该用户的数据
     
     返回:
     - dict: 包含各状态任务数量和总赏金的字典
@@ -231,13 +234,24 @@ def get_mission_status_summary():
         result = {}
         
         for status in status_list:
-            cursor.execute('''
-                SELECT 
-                    COUNT(*) as count, 
-                    SUM(bounty) as total_bounty 
-                FROM blood_cooperative_data 
-                WHERE status = ?
-            ''', (status,))
+            if user_id is not None:
+                # 只统计特定用户的数据
+                cursor.execute('''
+                    SELECT 
+                        COUNT(*) as count, 
+                        SUM(bounty) as total_bounty 
+                    FROM blood_cooperative_data 
+                    WHERE status = ? AND user_id = ?
+                ''', (status, user_id))
+            else:
+                # 统计所有用户的数据（保持向后兼容）
+                cursor.execute('''
+                    SELECT 
+                        COUNT(*) as count, 
+                        SUM(bounty) as total_bounty 
+                    FROM blood_cooperative_data 
+                    WHERE status = ?
+                ''', (status,))
             
             row = cursor.fetchone()
             if row:
