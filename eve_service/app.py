@@ -1,17 +1,18 @@
-from flask import Flask, render_template, jsonify, request, send_from_directory, session
+from flask import Flask, render_template, jsonify, request, send_from_directory, session, redirect
 from eve_service.scripts.get_price_history import name_to_id, get_price_history
 from eve_service.scripts.get_icon import get_item_icon
 from eve_service.scripts.get_buy_sell import get_buy_sell_data, get_max_buy_price_from_data, get_min_sell_price_from_data, get_middle_price_from_data
 from eve_service.scripts.search_items import search_items
-# 在文件顶部导入新函数
-from eve_service.scripts.get_blood_lp import get_blood_lp_rate, get_blood_cooperatives_task_data, save_blood_data_to_db, get_mission_status_summary
-from eve_service.scripts.models import UserManager  # 修改导入路径
+from eve_service.scripts.get_blood_lp import get_blood_lp_rate, get_blood_cooperatives_task_data, save_blood_data_to_db, get_mission_status_summary, get_blood_raider_lp_from_db
+from eve_service.scripts.models import UserManager 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-from datetime import datetime
-import secrets
+from datetime import datetime, timedelta
 import os
 import requests
+import base64
+import secrets
+import urllib.parse
 
 app = Flask(__name__)
 
@@ -22,10 +23,29 @@ from datetime import timedelta
 # 配置会话 - 统一配置（保留这一份）
 app.secret_key = os.environ.get('SECRET_KEY', 'b7c820226a1891011f53889d5e0d1295bbdd4b0d1faa12a1757cbd2644339ea4')
 print(f"[DEBUG] 当前 Flask SECRET_KEY: {app.secret_key}")
+#
+# Generated with the EVE Online Developer Portal
+# Application: EVEservice
+# Description:
+#   for personal account information get and process
+#
+
+# The client identifier to use when authenticating with the EVE Online SSO.
+client_id = "d2be126e6b31486daa8229156cecba15"
+
+# You should treat your client secret as you would a password. Do not share it outside of your application,
+# or package it along with your application in a way that would expose it to users.
+client_secret = "kL06gnPLF5n3fOefVuG4uiqZcZl5XNKNRxJP6n52"
+
+# The SSO will only accept this as a valid callback URL:
+callback_url = "http://127.0.0.1:5001/auth/callback"
+
+# This application can only request the following scopes:
+scopes = ["publicData","esi-calendar.respond_calendar_events.v1","esi-calendar.read_calendar_events.v1","esi-location.read_location.v1","esi-location.read_ship_type.v1","esi-mail.organize_mail.v1","esi-mail.read_mail.v1","esi-mail.send_mail.v1","esi-skills.read_skills.v1","esi-skills.read_skillqueue.v1","esi-wallet.read_character_wallet.v1","esi-wallet.read_corporation_wallet.v1","esi-search.search_structures.v1","esi-clones.read_clones.v1","esi-characters.read_contacts.v1","esi-universe.read_structures.v1","esi-killmails.read_killmails.v1","esi-corporations.read_corporation_membership.v1","esi-assets.read_assets.v1","esi-planets.manage_planets.v1","esi-fleets.read_fleet.v1","esi-fleets.write_fleet.v1","esi-ui.open_window.v1","esi-ui.write_waypoint.v1","esi-characters.write_contacts.v1","esi-fittings.read_fittings.v1","esi-fittings.write_fittings.v1","esi-markets.structure_markets.v1","esi-corporations.read_structures.v1","esi-characters.read_loyalty.v1","esi-characters.read_chat_channels.v1","esi-characters.read_medals.v1","esi-characters.read_standings.v1","esi-characters.read_agents_research.v1","esi-industry.read_character_jobs.v1","esi-markets.read_character_orders.v1","esi-characters.read_blueprints.v1","esi-characters.read_corporation_roles.v1","esi-location.read_online.v1","esi-contracts.read_character_contracts.v1","esi-clones.read_implants.v1","esi-characters.read_fatigue.v1","esi-killmails.read_corporation_killmails.v1","esi-corporations.track_members.v1","esi-wallet.read_corporation_wallets.v1","esi-characters.read_notifications.v1","esi-corporations.read_divisions.v1","esi-corporations.read_contacts.v1","esi-assets.read_corporation_assets.v1","esi-corporations.read_titles.v1","esi-corporations.read_blueprints.v1","esi-contracts.read_corporation_contracts.v1","esi-corporations.read_standings.v1","esi-corporations.read_starbases.v1","esi-industry.read_corporation_jobs.v1","esi-markets.read_corporation_orders.v1","esi-corporations.read_container_logs.v1","esi-industry.read_character_mining.v1","esi-industry.read_corporation_mining.v1","esi-planets.read_customs_offices.v1","esi-corporations.read_facilities.v1","esi-corporations.read_medals.v1","esi-characters.read_titles.v1","esi-alliances.read_contacts.v1","esi-characters.read_fw_stats.v1","esi-corporations.read_fw_stats.v1"]
 
 # 统一的session配置
 app.config['SESSION_COOKIE_NAME'] = 'eve_session'
-app.config['SESSION_COOKIE_SECURE'] = False  # 临时设置为 False 以测试 HTTP 环境
+app.config['SESSION_COOKIE_SECURE'] = True  
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_PATH'] = '/'
@@ -59,7 +79,9 @@ def xuexi_ranshao_page():
     max_isk_lp = get_blood_lp_rate()
     # 获取任务状态统计信息 - 不传user_id，显示所有用户数据（首次加载）
     mission_status = get_mission_status_summary()
-    return render_template("xuexi_ranshao.html", max_isk_lp=max_isk_lp, mission_status=mission_status)
+    # 获取血袭者LP点数
+    blood_raider_lp = get_blood_raider_lp_from_db()
+    return render_template("xuexi_ranshao.html", max_isk_lp=max_isk_lp, mission_status=mission_status, blood_raider_lp=blood_raider_lp)
 
 def process_item_data(item_id, item_name, region_id):
     """处理单个物品的数据获取"""
@@ -328,7 +350,7 @@ def check_auth():
 # 前端登录成功后，后续API请求没有正确传递会话ID
 @app.route('/api/blood_cooperatives_data')
 def get_blood_cooperatives_data():
-    """获取血袭合作社任务数据API - 增强认证"""
+    """获取血袭合作社任务数据API - 增强认证并集成EVE SSO数据"""
     try:
         # 详细的会话调试信息
         app.logger.info(f'🔍 [API] 收到数据请求')
@@ -383,17 +405,69 @@ def get_blood_cooperatives_data():
         
         app.logger.info(f'✅ 成功获取 {len(cooperatives_data)} 条合作社数据')
         
-        # 将数据保存到数据库
+        # 将血袭合作社数据保存到数据库
         try:
             save_success, save_message = save_blood_data_to_db(
                 user_info['id'], 
                 user_info['username'], 
                 cooperatives_data
             )
-            app.logger.info(f'💾 数据保存结果: {save_success}, 消息: {save_message}')
+            app.logger.info(f'💾 血袭合作社数据保存结果: {save_success}, 消息: {save_message}')
         except Exception as save_error:
-            app.logger.error(f'❌ 数据保存异常: {str(save_error)}')
-            save_success, save_message = False, f'数据保存失败: {str(save_error)}'
+            app.logger.error(f'❌ 血袭合作社数据保存异常: {str(save_error)}')
+            save_success, save_message = False, f'血袭合作社数据保存失败: {str(save_error)}'
+        
+        # 检查并获取EVE SSO数据
+        eve_data_result = {'success': False, 'message': '未登录EVE SSO'}
+        eve_character_id = session.get('eve_character_id')
+        eve_access_token = session.get('eve_access_token')
+        eve_token_expires = session.get('eve_token_expires')
+        
+        if eve_character_id and eve_access_token:
+            # 检查令牌是否过期
+            try:
+                if eve_token_expires:
+                    expires_time = datetime.fromisoformat(eve_token_expires)
+                    if datetime.now() >= expires_time:
+                        app.logger.warning('⏰ EVE SSO令牌已过期')
+                        eve_data_result = {'success': False, 'message': 'EVE SSO令牌已过期，请重新登录'}
+                    else:
+                        # 令牌有效，获取EVE数据
+                        app.logger.info(f'🚀 开始获取EVE SSO数据，角色ID: {eve_character_id}')
+                        
+                        # 导入EVE数据获取函数
+                        from scripts.get_blood_lp import BloodLPCollector
+                        
+                        collector = BloodLPCollector()
+                        eve_data = collector.get_eve_character_data(eve_character_id, eve_access_token)
+                        
+                        if eve_data:
+                            # 保存EVE数据到数据库
+                            eve_save_success = collector.save_eve_character_data_to_db(
+                                user_info['id'], 
+                                eve_character_id, 
+                                session.get('eve_character_name', 'Unknown'),
+                                eve_data
+                            )
+                            
+                            if eve_save_success:
+                                app.logger.info('✅ EVE SSO数据获取并保存成功')
+                                eve_data_result = {
+                                    'success': True, 
+                                    'message': 'EVE SSO数据更新成功',
+                                    'data': eve_data
+                                }
+                            else:
+                                app.logger.error('❌ EVE SSO数据保存失败')
+                                eve_data_result = {'success': False, 'message': 'EVE SSO数据保存失败'}
+                        else:
+                            app.logger.warning('⚠️ EVE SSO数据获取失败')
+                            eve_data_result = {'success': False, 'message': 'EVE SSO数据获取失败'}
+                else:
+                    eve_data_result = {'success': False, 'message': '令牌过期时间未知'}
+            except Exception as eve_error:
+                app.logger.error(f'❌ EVE SSO数据处理异常: {str(eve_error)}')
+                eve_data_result = {'success': False, 'message': f'EVE SSO数据处理失败: {str(eve_error)}'}
         
         # 数据处理和统计
         from collections import defaultdict
@@ -429,7 +503,8 @@ def get_blood_cooperatives_data():
                 'db_save_status': {
                     'success': save_success,
                     'message': save_message
-                }
+                },
+                'eve_sso_status': eve_data_result
             }
         })
         
@@ -514,7 +589,7 @@ def xuexi_register():
             'success': False,
             'message': f'服务器内部错误: {str(e)}'
         }), 500
-        
+
 
 # 在 app.py 中添加调试路由
 @app.route('/debug/session_test', methods=['GET', 'POST'])
@@ -637,5 +712,175 @@ def get_mission_status_summary_api():
             'message': f'服务器内部错误: {str(e)}'
         }), 500
         
+# 在 get_mission_status_summary_api 路由之后，if __name__ == "__main__": 之前添加以下代码：
+
+@app.route('/auth/login')
+def eve_sso_login():
+    """启动EVE SSO认证流程"""
+    try:
+        # 生成state参数用于防止CSRF攻击
+        state = secrets.token_urlsafe(32)
+        session['sso_state'] = state
+        
+        # 构建SSO授权URL
+        auth_params = {
+            'response_type': 'code',
+            'redirect_uri': callback_url,
+            'client_id': client_id,
+            'scope': ' '.join(scopes),
+            'state': state
+        }
+        
+        auth_url = 'https://login.eveonline.com/v2/oauth/authorize?' + urllib.parse.urlencode(auth_params)
+        
+        app.logger.info(f'🚀 启动EVE SSO认证，重定向到: {auth_url}')
+        
+        return redirect(auth_url)
+        
+    except Exception as e:
+        app.logger.error(f'❌ EVE SSO登录异常: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'SSO登录失败: {str(e)}'
+        }), 500
+
+@app.route('/auth/callback')
+def eve_sso_callback():
+    """处理EVE SSO回调"""
+    try:
+        # 验证state参数
+        state = request.args.get('state')
+        if not state or state != session.get('sso_state'):
+            app.logger.error('❌ SSO state验证失败')
+            return jsonify({
+                'success': False,
+                'message': 'SSO认证失败：state验证失败'
+            }), 400
+        
+        # 获取授权码
+        code = request.args.get('code')
+        if not code:
+            app.logger.error('❌ 未收到授权码')
+            return jsonify({
+                'success': False,
+                'message': 'SSO认证失败：未收到授权码'
+            }), 400
+        
+        # 交换访问令牌
+        token_data = exchange_code_for_token(code)
+        if not token_data:
+            return jsonify({
+                'success': False,
+                'message': 'SSO认证失败：令牌交换失败'
+            }), 400
+        
+        # 获取角色信息
+        character_info = get_character_info(token_data['access_token'])
+        if not character_info:
+            return jsonify({
+                'success': False,
+                'message': 'SSO认证失败：获取角色信息失败'
+            }), 400
+        
+        # 保存认证信息到session
+        session['eve_access_token'] = token_data['access_token']
+        session['eve_refresh_token'] = token_data.get('refresh_token')
+        session['eve_character_id'] = character_info['CharacterID']
+        session['eve_character_name'] = character_info['CharacterName']
+        session['eve_token_expires'] = (datetime.now() + timedelta(seconds=token_data.get('expires_in', 1200))).isoformat()
+        
+        # 清理临时state
+        session.pop('sso_state', None)
+        
+        app.logger.info(f'✅ EVE SSO认证成功: {character_info["CharacterName"]} (ID: {character_info["CharacterID"]})')
+        app.logger.info(f'🔑 访问令牌: {token_data["access_token"]}')
+        
+        return redirect('/')
+        
+    except Exception as e:
+        app.logger.error(f'❌ EVE SSO回调异常: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'SSO认证失败: {str(e)}'
+        }), 500
+
+@app.route('/auth/logout')
+def eve_sso_logout():
+    """EVE SSO登出"""
+    try:
+        # 清除EVE相关的session数据
+        eve_keys = ['eve_access_token', 'eve_refresh_token', 'eve_character_id', 
+                   'eve_character_name', 'eve_token_expires']
+        for key in eve_keys:
+            session.pop(key, None)
+        
+        app.logger.info('✅ EVE SSO登出成功')
+        
+        return redirect('/')
+        
+    except Exception as e:
+        app.logger.error(f'❌ EVE SSO登出异常: {str(e)}')
+        return redirect('/')
+
+def exchange_code_for_token(code):
+    """交换授权码获取访问令牌"""
+    try:
+        # 准备认证头
+        auth_string = f"{client_id}:{client_secret}"
+        auth_bytes = auth_string.encode('ascii')
+        auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+        
+        headers = {
+            'Authorization': f'Basic {auth_b64}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Host': 'login.eveonline.com'
+        }
+        
+        data = {
+            'grant_type': 'authorization_code',
+            'code': code
+        }
+        
+        response = requests.post(
+            'https://login.eveonline.com/v2/oauth/token',
+            headers=headers,
+            data=data,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            app.logger.error(f'❌ 令牌交换失败: {response.status_code} - {response.text}')
+            return None
+            
+    except Exception as e:
+        app.logger.error(f'❌ 令牌交换异常: {str(e)}')
+        return None
+
+def get_character_info(access_token):
+    """获取角色信息"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'User-Agent': 'EVEservice/1.0'
+        }
+        
+        response = requests.get(
+            'https://login.eveonline.com/oauth/verify',
+            headers=headers,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            app.logger.error(f'❌ 获取角色信息失败: {response.status_code} - {response.text}')
+            return None
+            
+    except Exception as e:
+        app.logger.error(f'❌ 获取角色信息异常: {str(e)}')
+        return None
+
 if __name__ == "__main__":
     app.run(debug=True, port=5001)

@@ -16,6 +16,13 @@
             <div class="navbar-menu">
                 <a href="/price_history" class="navbar-item">价格查询</a>
                 <a href="/xuexi_ranshao" class="navbar-item">血袭燃烧</a>
+                <!-- EVE SSO 认证按钮 -->
+                {% if session.get('eve_character_name') %}
+                    <span class="navbar-item">{{ session.get('eve_character_name') }}</span>
+                    <a href="/auth/logout" class="navbar-item">退出</a>
+                {% else %}
+                    <a href="/auth/login" class="navbar-item">EVE SSO 登录</a>
+                {% endif %}
             </div>
         </div>
     </nav>
@@ -219,6 +226,15 @@
                 <div class="info-card clickable" onclick="openSettingsModal()">
                     <div class="info-label">实时合作社回收 ISK/LP 比率</div>
                     <div class="info-value">2200</div>
+                </div>
+                <!-- 新增血袭者LP点数显示卡片 -->
+                <div class="info-card">
+                    <div class="info-label">血袭者LP点数</div>
+                    <div class="info-value">{{ '{:,}'.format(blood_raider_lp) if blood_raider_lp else '0' }}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">意林奸商价</div>
+                    <div class="info-value">{{ '{:,.0f}'.format(2200 * blood_raider_lp) if blood_raider_lp else '0' }}</div>
                 </div>
             </div>
             
@@ -2048,6 +2064,39 @@ async function checkAuthStatus(retryCount = 0) {
 
 
 
+        // 更新血袭者LP点数计算
+        function updateBloodRaiderLPCalculation() {
+            const infoCards = document.querySelectorAll('.info-card');
+            let currentRate = 2200; // 默认比率
+            
+            // 获取当前设置的比率
+            if (infoCards.length > 1) {
+                const cooperativeCard = infoCards[1].querySelector('.info-value');
+                if (cooperativeCard) {
+                    currentRate = parseFloat(cooperativeCard.textContent) || 2200;
+                }
+            }
+            
+            // 获取血袭者LP点数
+            let bloodRaiderLP = 0;
+            if (infoCards.length > 2) {
+                const lpCard = infoCards[2].querySelector('.info-value');
+                if (lpCard) {
+                    // 移除千分位分隔符并转换为数字
+                    bloodRaiderLP = parseFloat(lpCard.textContent.replace(/,/g, '')) || 0;
+                }
+            }
+            
+            // 更新计算结果
+            if (infoCards.length > 3) {
+                const calculationCard = infoCards[3].querySelector('.info-value');
+                if (calculationCard) {
+                    const calculatedValue = currentRate * bloodRaiderLP;
+                    calculationCard.textContent = new Intl.NumberFormat('zh-CN').format(Math.round(calculatedValue));
+                }
+            }
+        }
+
         // 处理表单提交
         settingsForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -2071,6 +2120,9 @@ async function checkAuthStatus(retryCount = 0) {
             // 更新当前比率显示
             currentRateSpan.textContent = newRate;
 
+            // 更新血袭者LP点数计算
+            updateBloodRaiderLPCalculation();
+
             // 保存到本地存储
             localStorage.setItem('cooperativeRate', newRate);
 
@@ -2090,6 +2142,11 @@ async function checkAuthStatus(retryCount = 0) {
                     }
                 }
                 currentRateSpan.textContent = savedRate;
+                
+                // 页面加载时也更新血袭者LP点数计算
+                setTimeout(() => {
+                    updateBloodRaiderLPCalculation();
+                }, 100);
             }
         });
 

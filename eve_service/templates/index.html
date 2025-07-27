@@ -14,6 +14,13 @@
             <div class="navbar-menu">
                 <a href="/price_history" class="navbar-item">价格查询</a>
                 <a href="/xuexi_ranshao" class="navbar-item">血袭燃烧</a>
+                <!-- EVE SSO 认证按钮 -->
+                {% if session.get('eve_character_name') %}
+                    <span class="navbar-item">{{ session.get('eve_character_name') }}</span>
+                    <a href="/auth/logout" class="navbar-item">退出</a>
+                {% else %}
+                    <a href="/auth/login" class="navbar-item">EVE SSO 登录</a>
+                {% endif %}
             </div>
         </div>
     </nav>
