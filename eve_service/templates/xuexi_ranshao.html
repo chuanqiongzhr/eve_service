@@ -1300,6 +1300,104 @@
             color: #1976d2;
             margin-bottom: 20px;
         }
+
+        /* EVE令牌通知样式 */
+        .eve-token-notification {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .eve-token-notification .notification-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .eve-token-notification .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .eve-token-notification .notification-text {
+            flex: 1;
+        }
+
+        .eve-token-notification .notification-text strong {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .eve-token-notification .notification-text p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .eve-token-notification .notification-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .eve-token-notification .btn-primary {
+            background: linear-gradient(135deg, #1976d2, #42a5f5);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .eve-token-notification .btn-primary:hover {
+            background: linear-gradient(135deg, #1565c0, #64b5f6);
+            transform: translateY(-1px);
+        }
+
+        .eve-token-notification .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+            border: 1px solid #ddd;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .eve-token-notification .btn-secondary:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
     </style>
 
     <script>
@@ -1758,9 +1856,140 @@ async function checkAuthStatus(retryCount = 0) {
         document.addEventListener('DOMContentLoaded', function() {
             debugEveSSO();
             checkAuthStatus();
+            // 🆕 添加EVE SSO过期检查
+            checkEveTokenOnPageLoad();
             // 初始化表格
             initTables();
         });
+
+        // 🆕 页面加载时检查EVE SSO令牌状态
+        function checkEveTokenOnPageLoad() {
+            const eveCharacterId = '{{ session.get("eve_character_id") if session else "" }}';
+            const eveTokenExpires = '{{ session.get("eve_token_expires") if session else "" }}';
+            
+            // 如果用户已经绑定了EVE SSO但令牌过期
+            if (eveCharacterId && eveTokenExpires) {
+                const expiresTime = new Date(eveTokenExpires);
+                const now = new Date();
+                const timeLeft = Math.floor((expiresTime - now) / 1000 / 60); // 分钟
+                
+                console.log(`🔍 [checkEveTokenOnPageLoad] EVE SSO令牌检查:`, {
+                    character_id: eveCharacterId,
+                    expires_at: eveTokenExpires,
+                    time_left_minutes: timeLeft,
+                    is_expired: timeLeft <= 0
+                });
+                
+                if (timeLeft <= 0) {
+                    // 令牌已过期，显示提醒
+                    console.warn(`⚠️ [checkEveTokenOnPageLoad] EVE SSO令牌已过期，提醒用户重新登录`);
+                    showEveTokenExpiredNotification();
+                } else if (timeLeft <= 10) {
+                    // 令牌即将过期（10分钟内），显示警告
+                    console.warn(`⚠️ [checkEveTokenOnPageLoad] EVE SSO令牌即将过期，剩余${timeLeft}分钟`);
+                    showEveTokenExpiringNotification(timeLeft);
+                }
+            }
+        }
+
+        // 🆕 显示EVE SSO令牌过期通知
+        function showEveTokenExpiredNotification() {
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.className = 'eve-token-notification expired';
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <div class="notification-icon">⚠️</div>
+                    <div class="notification-text">
+                        <strong>EVE SSO会话已过期</strong>
+                        <p>您的EVE在线认证已过期，无法获取最新的忠诚点数据。请重新登录EVE SSO以继续使用完整功能。</p>
+                    </div>
+                    <div class="notification-actions">
+                        <button onclick="window.location.href='/auth/login'" class="btn-primary">重新登录EVE SSO</button>
+                        <button onclick="closeEveTokenNotification()" class="btn-secondary">稍后提醒</button>
+                    </div>
+                </div>
+            `;
+            
+            // 添加样式
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #fff;
+                border: 2px solid #ff6b6b;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                padding: 16px;
+                max-width: 400px;
+                z-index: 10000;
+                animation: slideInRight 0.3s ease-out;
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // 5分钟后自动隐藏
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    closeEveTokenNotification();
+                }
+            }, 5 * 60 * 1000);
+        }
+
+        // 🆕 显示EVE SSO令牌即将过期通知
+        function showEveTokenExpiringNotification(minutesLeft) {
+            const notification = document.createElement('div');
+            notification.className = 'eve-token-notification expiring';
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <div class="notification-icon">⏰</div>
+                    <div class="notification-text">
+                        <strong>EVE SSO会话即将过期</strong>
+                        <p>您的EVE在线认证将在${minutesLeft}分钟后过期。建议提前重新登录以避免数据获取中断。</p>
+                    </div>
+                    <div class="notification-actions">
+                        <button onclick="window.location.href='/auth/login'" class="btn-primary">立即重新登录</button>
+                        <button onclick="closeEveTokenNotification()" class="btn-secondary">知道了</button>
+                    </div>
+                </div>
+            `;
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #fff;
+                border: 2px solid #ffa726;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                padding: 16px;
+                max-width: 400px;
+                z-index: 10000;
+                animation: slideInRight 0.3s ease-out;
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // 2分钟后自动隐藏
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    closeEveTokenNotification();
+                }
+            }, 2 * 60 * 1000);
+        }
+
+        // 🆕 关闭EVE令牌通知
+        function closeEveTokenNotification() {
+            const notifications = document.querySelectorAll('.eve-token-notification');
+            notifications.forEach(notification => {
+                notification.style.animation = 'slideOutRight 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            });
+        }
 
         // 添加到全局，方便手动调用
         window.debugEveSSO = debugEveSSO;
@@ -2385,6 +2614,36 @@ async function checkAuthStatus(retryCount = 0) {
                     }
                 } else {
                     console.log('⚠️ [updatePageStatistics] 任务状态统计信息请求失败:', response.status);
+                }
+                
+                // 更新血袭者LP点数
+                console.log('🔄 [updatePageStatistics] 更新血袭者LP点数');
+                try {
+                    const lpResponse = await fetch('/api/blood_raider_lp');
+                    if (lpResponse.ok) {
+                        const lpResult = await lpResponse.json();
+                        if (lpResult.success) {
+                            // 更新血袭者LP点数显示
+                            const infoCards = document.querySelectorAll('.info-card');
+                            if (infoCards.length > 2) {
+                                const lpCard = infoCards[2].querySelector('.info-value');
+                                if (lpCard) {
+                                    lpCard.textContent = new Intl.NumberFormat('zh-CN').format(lpResult.blood_raider_lp);
+                                }
+                            }
+                            
+                            // 更新意林奸商价计算
+                            updateBloodRaiderLPCalculation();
+                            
+                            console.log('✅ [updatePageStatistics] 血袭者LP点数更新完成:', lpResult.blood_raider_lp);
+                        } else {
+                            console.log('⚠️ [updatePageStatistics] 获取血袭者LP点数失败:', lpResult.message);
+                        }
+                    } else {
+                        console.log('⚠️ [updatePageStatistics] 血袭者LP点数请求失败:', lpResponse.status);
+                    }
+                } catch (error) {
+                    console.error('❌ [updatePageStatistics] 更新血袭者LP点数时出错:', error);
                 }
                 
                 // 刷新已支付任务表格

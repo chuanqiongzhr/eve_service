@@ -62,6 +62,23 @@ def add_header(response):
         response.headers['Cache-Control'] = 'no-store'
     return response
 
+# 在现有路由后添加
+@app.route('/api/blood_raider_lp')
+def get_blood_raider_lp_api():
+    """获取血袭者LP点数API接口"""
+    try:
+        blood_raider_lp = get_blood_raider_lp_from_db()
+        return jsonify({
+            'success': True,
+            'blood_raider_lp': blood_raider_lp
+        })
+    except Exception as e:
+        app.logger.error(f'获取血袭者LP点数失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'获取血袭者LP点数失败: {str(e)}'
+        }), 500
+        
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory('static', 'favicon.ico')
