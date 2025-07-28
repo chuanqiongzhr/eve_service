@@ -394,7 +394,10 @@ def get_blood_cooperatives_data():
         
         # 获取合作社数据
         app.logger.info(f'📡 开始获取合作社数据，用户: {blood_username}')
-        cooperatives_data = get_blood_cooperatives_task_data(blood_username, blood_password)
+        cooperatives_response = get_blood_cooperatives_task_data(blood_username, blood_password)
+        
+        # 从返回的完整数据中提取任务列表
+        cooperatives_data = cooperatives_response.get('data', []) if cooperatives_response else []
         
         if not cooperatives_data:
             app.logger.warning('获取合作社数据失败或数据为空')
@@ -436,19 +439,28 @@ def get_blood_cooperatives_data():
                         app.logger.info(f'🚀 开始获取EVE SSO数据，角色ID: {eve_character_id}')
                         
                         # 导入EVE数据获取函数
-                        from scripts.get_blood_lp import BloodLPCollector
-                        
-                        collector = BloodLPCollector()
-                        eve_data = collector.get_eve_character_data(eve_character_id, eve_access_token)
-                        
+                        from .scripts.get_blood_lp import get_eve_character_data, save_eve_character_data_to_db
+
+                        eve_data = get_eve_character_data(eve_character_id, eve_access_token)
+
                         if eve_data:
-                            # 保存EVE数据到数据库
-                            eve_save_success = collector.save_eve_character_data_to_db(
+                            eve_save_success, eve_save_message = save_eve_character_data_to_db(
                                 user_info['id'], 
                                 eve_character_id, 
                                 session.get('eve_character_name', 'Unknown'),
                                 eve_data
                             )
+                            
+                            if eve_save_success:
+                                app.logger.info('✅ EVE SSO数据获取并保存成功')
+                                eve_data_result = {
+                                    'success': True, 
+                                    'message': 'EVE SSO数据更新成功',
+                                    'data': eve_data
+                                }
+                            else:
+                                app.logger.error(f'❌ EVE SSO数据保存失败: {eve_save_message}')
+                                eve_data_result = {'success': False, 'message': f'EVE SSO数据保存失败: {eve_save_message}'}
                             
                             if eve_save_success:
                                 app.logger.info('✅ EVE SSO数据获取并保存成功')
@@ -676,6 +688,38 @@ def session_debug():
     return response
     
 # 在现有的API路由后添加
+@app.route('/api/paid_missions_summary')
+def get_paid_missions_api():
+    """获取已支付任务汇总API"""
+    try:
+        from eve_service.scripts.get_blood_lp import get_paid_missions_summary
+        data = get_paid_missions_summary()
+        return jsonify({
+            'success': True,
+            'data': data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/recent_wallet_donations')
+def get_recent_wallet_donations_api():
+    """获取最近钱包捐赠记录API"""
+    try:
+        from eve_service.scripts.get_blood_lp import get_recent_wallet_donations
+        data = get_recent_wallet_donations(10)
+        return jsonify({
+            'success': True,
+            'data': data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 @app.route('/api/mission_status_summary')
 def get_mission_status_summary_api():
     """获取任务状态统计信息API"""
@@ -787,7 +831,7 @@ def eve_sso_callback():
         session['eve_refresh_token'] = token_data.get('refresh_token')
         session['eve_character_id'] = character_info['CharacterID']
         session['eve_character_name'] = character_info['CharacterName']
-        session['eve_token_expires'] = (datetime.now() + timedelta(seconds=token_data.get('expires_in', 1200))).isoformat()
+        session['eve_token_expires'] = (datetime.now() + timedelta(seconds=max(token_data.get('expires_in', 1200), 3600))).isoformat()
         
         # 清理临时state
         session.pop('sso_state', None)
@@ -881,6 +925,84 @@ def get_character_info(access_token):
     except Exception as e:
         app.logger.error(f'❌ 获取角色信息异常: {str(e)}')
         return None
+
+
+
+def refresh_eve_token():
+    """刷新EVE SSO访问令牌"""
+    try:
+        if 'eve_refresh_token' not in session:
+            app.logger.warning('没有refresh_token，无法刷新令牌')
+            return False
+            
+        # 准备认证头
+        auth_string = f"{client_id}:{client_secret}"
+        auth_bytes = auth_string.encode('ascii')
+        auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+        
+        headers = {
+            'Authorization': f'Basic {auth_b64}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Host': 'login.eveonline.com'
+        }
+        
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': session['eve_refresh_token']
+        }
+        
+        response = requests.post(
+            'https://login.eveonline.com/v2/oauth/token',
+            headers=headers,
+            data=data,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            
+            # 更新session中的令牌信息
+            session['eve_access_token'] = token_data['access_token']
+            if 'refresh_token' in token_data:
+                session['eve_refresh_token'] = token_data['refresh_token']
+            
+            # 延长令牌过期时间 - 这里是关键改进
+            expires_in = token_data.get('expires_in', 1200)
+            # 可以选择延长过期时间，比如设置为更长的时间
+            extended_expires_in = max(expires_in, 3600)  # 至少1小时
+            session['eve_token_expires'] = (datetime.now() + timedelta(seconds=extended_expires_in)).isoformat()
+            
+            app.logger.info(f'✅ EVE SSO令牌刷新成功，延长至{extended_expires_in}秒后过期')
+            return True
+        else:
+            app.logger.error(f'❌ 令牌刷新失败: {response.status_code} - {response.text}')
+            return False
+            
+    except Exception as e:
+        app.logger.error(f'❌ 令牌刷新异常: {str(e)}')
+        return False
+
+@app.before_request
+def check_eve_token():
+    if 'eve_token_expires' in session:
+        expires_time = datetime.fromisoformat(session['eve_token_expires'])
+        # 提前10分钟刷新令牌（增加缓冲时间）
+        if datetime.now() >= expires_time - timedelta(minutes=10):
+            try:
+                # 使用refresh_token刷新访问令牌
+                if not refresh_eve_token():
+                    # 刷新失败，清除令牌信息
+                    session.pop('eve_token_expires', None)
+                    session.pop('eve_access_token', None)
+                    session.pop('eve_refresh_token', None)
+                    app.logger.warning('令牌刷新失败，已清除session信息')
+            except Exception as e:
+                app.logger.warning(f'令牌刷新失败: {e}')
+                # 清除过期令牌，强制重新登录
+                session.pop('eve_token_expires', None)
+                session.pop('eve_access_token', None)
+                session.pop('eve_refresh_token', None)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)

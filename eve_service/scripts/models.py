@@ -73,7 +73,9 @@ class UserManager:
         """创建新用户"""
         try:
             # 首先验证用户是否有效（调用外部API）
-            data = get_blood_cooperatives_task_data(username, password)
+            response_data = get_blood_cooperatives_task_data(username, password)
+            # 从返回的完整数据中检查是否有有效数据
+            data = response_data.get('data', []) if response_data else []
             if not data:
                 return False, "外部验证失败"
             
