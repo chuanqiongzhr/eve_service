@@ -17,4 +17,4 @@ instance/
 .webassets-cache
 
 # Database files
-sctipts/eve_data.db
+eve_service/scripts/eve_data.db

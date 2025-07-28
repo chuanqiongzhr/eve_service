@@ -469,8 +469,14 @@ def save_eve_character_data_to_db(user_id, character_id, character_name, eve_dat
         ''')
         
         cursor.execute('''
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_user_character_journal 
-            ON eve_wallet_journal (user_id, character_id, journal_id)
+            DROP INDEX IF EXISTS idx_user_character_journal
+        ''')
+        
+        # 创建新的复合唯一索引，处理journal_id为NULL的情况
+        cursor.execute('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_user_character_journal_unique 
+            ON eve_wallet_journal (user_id, character_id, 
+                                  COALESCE(journal_id, date || '_' || ref_type || '_' || amount))
         ''')
         
         # 获取当前时间
@@ -1231,10 +1237,12 @@ def get_recent_wallet_donations(limit=10):
         
         # 查询个人捐赠和军团账户支取记录，移除时间过滤
         cursor.execute('''
-            SELECT character_name, amount, ref_type, date, description, first_party_id, second_party_id, timestamp
+            SELECT DISTINCT character_name, amount, ref_type, date, description, 
+                           first_party_id, second_party_id, timestamp
             FROM eve_wallet_journal 
             WHERE ref_type IN ('player_donation', 'corporation_account_withdrawal')
-            ORDER BY COALESCE(date, timestamp) DESC
+            GROUP BY character_name, amount, ref_type, date, description
+            ORDER BY MAX(COALESCE(date, timestamp)) DESC
             LIMIT ?
         ''', (limit,))
         
