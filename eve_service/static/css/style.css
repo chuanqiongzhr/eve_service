@@ -70,6 +70,16 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     border: 2px solid #1976d2;
     text-align: center;
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* 夜间模式下的 total-info 样式 */
+[data-theme="dark"] .total-info {
+    background-color: #1e3a5f;
+    border-color: #64b5f6;
+    color: var(--text-color);
+    box-shadow: 0 2px 4px var(--shadow-color);
 }
 
 .chart-container {
@@ -126,14 +136,15 @@
 
 /* 导航栏样式 */
 .navbar {
-    background-color: #1976d2;
+    background: linear-gradient(135deg, #1976d2, #1565c0);
     padding: 10px 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1000;
+    z-index: 1001; /* 提高z-index确保在最上层 */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .navbar-container {
@@ -141,7 +152,7 @@
     margin: 0 auto;
     display: flex;
     align-items: center;
-    gap: 20px;
+    justify-content: space-between; /* 修改为两端对齐 */
 }
 
 .navbar-brand {
@@ -150,31 +161,41 @@
     font-size: 1.5em;
     font-weight: bold;
     margin-right: 20px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .navbar-menu {
     display: flex;
     gap: 20px;
+    align-items: center;
 }
 
 .navbar-item {
     color: white;
     text-decoration: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    transition: background-color 0.3s;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    font-weight: 500;
 }
 
 .navbar-item:hover {
-    background-color: #1565c0;
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
 }
 
 /* 为导航栏腾出空间 */
 body {
     padding-top: 60px;
+    margin: 0;
 }
 
-/* 加载动画样式 */
+/* 加载动画样式 - 优化版本 */
+.loading {
+    position: relative;
+}
+
+/* 加载动画样式 - 日夜模式适配 */
 .loading {
     position: relative;
 }
@@ -186,8 +207,10 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.8);
+    background: var(--modal-bg);
+    opacity: 0.9;
     z-index: 1000;
+    transition: background-color 0.3s ease;
 }
 
 .loading-spinner {
@@ -198,8 +221,8 @@ body {
     transform: translate(-50%, -50%);
     width: 50px;
     height: 50px;
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #1976d2;
+    border: 5px solid var(--border-color);
+    border-top: 5px solid var(--navbar-bg);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     z-index: 1001;
@@ -207,6 +230,235 @@ body {
 
 .loading .loading-spinner {
     display: block;
+}
+
+/* 局部加载指示器 - 日夜模式 */
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    background: var(--section-bg);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--navbar-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 页面级别的轻量加载指示器 */
+.page-loading {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    background: var(--card-bg);
+    padding: 12px 20px;
+    border-radius: 25px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.page-loading .mini-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--navbar-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 内容区域加载状态 */
+.content-loading {
+    position: relative;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--section-bg);
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px dashed var(--border-color);
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.content-loading .loading-text {
+    color: var(--text-color);
+    font-size: 14px;
+    margin-left: 10px;
+}
+
+/* 表格加载状态 */
+.table-loading {
+    position: relative;
+    background: var(--table-bg);
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    border: 1px solid var(--table-border);
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.table-loading .loading-message {
+    color: var(--text-color);
+    font-size: 16px;
+    margin-top: 15px;
+}
+
+/* 智能加载指示器 */
+.smart-loading {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card-bg);
+    padding: 15px 25px;
+    border-radius: 30px;
+    box-shadow: 0 6px 20px var(--shadow-color);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(10px);
+    animation: slideDown 0.3s ease;
+    transition: all 0.3s ease;
+}
+
+.smart-loading .progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--navbar-bg);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.smart-loading .progress-dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.smart-loading .progress-dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+/* 更新状态显示的加载适配 */
+.update-status-display {
+    background-color: var(--section-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.progress-bar {
+    background-color: var(--border-color);
+    transition: background-color 0.3s ease;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, var(--navbar-bg), var(--navbar-hover));
+    transition: background 0.3s ease;
+}
+
+.step-icon {
+    background-color: var(--border-color);
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.step-icon.active {
+    background-color: var(--navbar-bg);
+    color: white;
+}
+
+.step-icon.completed {
+    background-color: var(--amount-color);
+    color: white;
+}
+
+.step-text {
+    color: var(--text-color);
+    transition: color 0.3s ease;
+}
+
+/* 夜间模式特殊适配 */
+[data-theme="dark"] .loading::after {
+    background: rgba(26, 26, 26, 0.95);
+}
+
+[data-theme="dark"] .loading-spinner {
+    border-color: #444;
+    border-top-color: #64b5f6;
+}
+
+[data-theme="dark"] .spinner {
+    border-color: #444;
+    border-top-color: #64b5f6;
+}
+
+[data-theme="dark"] .mini-spinner {
+    border-color: #444;
+    border-top-color: #64b5f6;
+}
+
+[data-theme="dark"] .progress-dot {
+    background: #64b5f6;
+}
+
+/* 动画关键帧 */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+[data-theme="dark"] .page-loading {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .content-loading {
+    background: var(--section-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .table-loading {
+    background: var(--table-bg);
+    border-color: var(--table-border);
 }
 
 @keyframes spin {
@@ -305,4 +557,728 @@ body {
 
 .form-check-label {
     margin-bottom: 0;
+}
+
+/* 夜间模式样式 */
+:root {
+    --bg-color: #ffffff;
+    --text-color: #333333;
+    --navbar-bg: #1976d2;
+    --navbar-hover: #1565c0;
+    --card-bg: #f5f5f5;
+    --border-color: #333;
+    --modal-bg: #ffffff;
+    --shadow-color: rgba(0,0,0,0.1);
+    --table-bg: #ffffff;
+    --table-header-bg: linear-gradient(135deg, #1976d2, #42a5f5);
+    --table-border: #e0e0e0;
+    --table-hover: #f5f5f5;
+    --section-bg: #f8f9fa;
+    --amount-color: #388e3c;
+    --count-color: #1976d2;
+}
+
+[data-theme="dark"] {
+    --bg-color: #1a1a1a;
+    --text-color: #e0e0e0;
+    --navbar-bg: #2c2c2c;
+    --navbar-hover: #404040;
+    --card-bg: #2d2d2d;
+    --border-color: #555;
+    --modal-bg: #2d2d2d;
+    --shadow-color: rgba(0,0,0,0.3);
+    --table-bg: #2d2d2d;
+    --table-header-bg: linear-gradient(135deg, #2c2c2c, #404040);
+    --table-border: #444;
+    --table-hover: #3a3a3a;
+    --section-bg: #2a2a2a;
+    --amount-color: #66bb6a;
+    --count-color: #64b5f6;
+}
+
+/* 夜间模式导航栏 */
+[data-theme="dark"] .navbar {
+    background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+    border-bottom: 1px solid #333;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    padding-top: 60px;
+}
+
+.navbar {
+    background-color: var(--navbar-bg);
+    padding: 10px 20px;
+    box-shadow: 0 2px 4px var(--shadow-color);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+.navbar-item:hover {
+    background-color: var(--navbar-hover);
+}
+
+.title-bar, .item-info, .info-bar {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+.modal-content {
+    background-color: var(--modal-bg);
+    color: var(--text-color);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px var(--shadow-color);
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+}
+
+.search-input {
+    padding: 8px;
+    font-size: 16px;
+    width: 300px;
+    border: 2px solid var(--border-color);
+    border-radius: 5px;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+/* 表格夜间模式样式 */
+.table-section {
+    background-color: var(--section-bg);
+    color: var(--text-color);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.table-section h4 {
+    color: var(--text-color);
+}
+
+.data-table {
+    background-color: var(--table-bg);
+    color: var(--text-color);
+}
+
+.data-table th {
+    background: var(--table-header-bg);
+    color: white;
+}
+
+.data-table td {
+    border-bottom: 1px solid var(--table-border);
+    color: var(--text-color);
+}
+
+.data-table tbody tr:hover {
+    background-color: var(--table-hover);
+}
+
+.data-table .amount {
+    color: var(--amount-color);
+}
+
+.data-table .count {
+    color: var(--count-color);
+}
+
+/* 信息卡片夜间模式 */
+.info-card {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .info-card {
+    background: linear-gradient(135deg, #2d2d2d, #3a3a3a);
+    border: 2px solid #444;
+}
+
+[data-theme="dark"] .info-card:hover {
+    background: linear-gradient(135deg, #3a3a3a, #4a4a4a);
+    border-color: #555;
+}
+
+.info-label {
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .info-label {
+    color: #b0b0b0;
+}
+
+.info-value {
+    color: var(--count-color);
+}
+
+.info-bounty {
+    color: var(--amount-color);
+}
+
+/* 更新状态显示夜间模式 */
+.update-status-display {
+    background-color: var(--section-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.progress-bar {
+    background-color: var(--border-color);
+}
+
+.step-icon {
+    background-color: var(--border-color);
+    color: var(--text-color);
+}
+
+.step-text {
+    color: var(--text-color);
+}
+
+/* 任务状态信息夜间模式 */
+.mission-status-info h3 {
+    color: var(--count-color);
+}
+
+/* 导航栏主题切换按钮样式 */
+.theme-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto; /* 添加自动左边距，使按钮靠右 */
+}
+
+.theme-btn:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+/* 下拉菜单样式 */
+/* 下拉菜单容器 */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+/* 下拉菜单触发按钮 */
+.user-btn {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.user-btn:after {
+    content: "▼";
+    font-size: 0.7em;
+    margin-left: 5px;
+}
+
+/* 下拉菜单内容 - 使用绝对定位脱离文档流 */
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: #fff;
+    min-width: 160px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    border-radius: 4px;
+    z-index: 9999;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+/* 显示下拉菜单 */
+.dropdown.active .dropdown-menu {
+    display: block;
+}
+
+/* 下拉菜单项 */
+.dropdown-menu a {
+    color: #333;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+    transition: background-color 0.2s;
+}
+
+.dropdown-menu a:hover {
+    background-color: #f1f1f1;
+    color: #1976d2;
+}
+
+/* 夜间模式样式 */
+[data-theme="dark"] .dropdown-menu {
+    background-color: #333;
+}
+
+[data-theme="dark"] .dropdown-menu a {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .dropdown-menu a:hover {
+    background-color: #444;
+    color: #64b5f6;
+}
+
+/* 下拉菜单内容样式 */
+.dropdown-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: #fff;
+    min-width: 160px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    border-radius: 4px;
+    z-index: 9999;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+/* 显示下拉菜单 */
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+/* 下拉菜单项 */
+.dropdown-content a {
+    color: #333;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+    transition: background-color 0.2s;
+}
+
+.dropdown-content a:hover {
+    background-color: #f1f1f1;
+    color: #1976d2;
+}
+
+/* 夜间模式样式 */
+[data-theme="dark"] .dropdown-content {
+    background-color: #333;
+}
+
+[data-theme="dark"] .dropdown-content a {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .dropdown-content a:hover {
+    background-color: #444;
+    color: #64b5f6;
+}
+
+/* 夜间模式切换按钮 - 已注释掉 */
+/* .theme-toggle {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1976d2, #42a5f5);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(25, 118, 210, 0.2);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(25, 118, 210, 0.3);
+}
+
+.theme-toggle:active {
+    transform: translateY(0);
+}
+
+[data-theme="dark"] .theme-toggle {
+    background: linear-gradient(135deg, #ff9800, #ffb74d);
+    box-shadow: 0 4px 15px rgba(255, 152, 0, 0.2);
+}
+
+[data-theme="dark"] .theme-toggle:hover {
+    background: linear-gradient(135deg, #f57c00, #ffa726);
+    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.3);
+} */
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    /* .theme-toggle {
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    } */
+    
+    .tables-container {
+        flex-direction: column;
+    }
+}
+
+/* Canvas元素夜间模式样式 */
+canvas {
+    transition: filter 0.3s ease;
+}
+
+[data-theme="dark"] canvas {
+    filter: invert(0.9) hue-rotate(180deg);
+    background-color: var(--bg-color) !important;
+}
+
+/* 如果是图表容器，也需要适配 */
+.chart-container,
+#chart-container,
+[id*="chart"],
+[class*="chart"] {
+    background-color: var(--bg-color);
+    transition: background-color 0.3s ease;
+}
+
+[data-theme="dark"] .chart-container,
+[data-theme="dark"] #chart-container,
+[data-theme="dark"] [id*="chart"],
+[data-theme="dark"] [class*="chart"] {
+    background-color: var(--bg-color);
+}
+
+/* 特别针对ECharts等图表库的canvas */
+[data-theme="dark"] canvas[data-zr-dom-id] {
+    filter: none; /* 移除反色滤镜，因为ECharts有自己的主题 */
+    background-color: transparent;
+}
+
+/* 智能加载指示器 */
+.smart-loading {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card-bg);
+    padding: 15px 25px;
+    border-radius: 30px;
+    box-shadow: 0 6px 20px var(--shadow-color);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(10px);
+    animation: slideDown 0.3s ease;
+}
+
+.smart-loading .progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--navbar-bg);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.smart-loading .progress-dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.smart-loading .progress-dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* 移除原有的满屏加载样式 */
+.loading.fullscreen::after {
+    display: none;
+}
+
+.loading.fullscreen .loading-spinner {
+    display: none;
+}
+
+/* 加载动画样式 - 移除全屏遮罩 */
+.loading {
+    position: relative;
+}
+
+/* 移除全屏遮罩效果 */
+.loading::after {
+    display: none;
+}
+
+/* 改为小型加载指示器 */
+.loading-spinner {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--navbar-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 10;
+}
+
+.loading .loading-spinner {
+    display: block;
+}
+
+/* 内联加载指示器 */
+.inline-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--section-bg);
+    border-radius: 20px;
+    font-size: 14px;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.inline-loading .mini-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--navbar-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 顶部通知栏加载 */
+.top-loading {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card-bg);
+    padding: 10px 20px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    animation: slideDown 0.3s ease;
+}
+
+.top-loading .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--navbar-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 按钮内加载状态 */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 表格行加载状态 */
+.table-row-loading {
+    background: var(--section-bg);
+    opacity: 0.6;
+    position: relative;
+}
+
+.table-row-loading::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--navbar-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 卡片加载状态 */
+.card-loading {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    color: var(--text-color);
+}
+
+.card-loading .loading-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.card-loading .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--navbar-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 进度条加载 */
+.progress-loading {
+    width: 100%;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-loading::after {
+    content: '';
+    display: block;
+    width: 30%;
+    height: 100%;
+    background: var(--navbar-bg);
+    border-radius: 2px;
+    animation: progressMove 1.5s ease-in-out infinite;
+}
+
+/* 动画定义 */
+@keyframes progressMove {
+    0% {
+        transform: translateX(-100%);
+    }
+    50% {
+        transform: translateX(200%);
+    }
+    100% {
+        transform: translateX(300%);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* 夜间模式适配 */
+[data-theme="dark"] .loading-spinner,
+[data-theme="dark"] .mini-spinner,
+[data-theme="dark"] .top-loading .spinner,
+[data-theme="dark"] .card-loading .spinner {
+    border-color: #444;
+    border-top-color: #64b5f6;
+}
+
+[data-theme="dark"] .progress-loading::after {
+    background: #64b5f6;
+}
+
+/* 页面加载优化 */
+body {
+    /* 避免重排重绘 */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* 导航栏优先显示 */
+.navbar {
+    will-change: transform;
+    contain: layout style paint;
+}
+
+/* 内容区域懒加载 */
+.content-loading {
+    opacity: 0.3;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+/* 图表容器优化 */
+.chart-container {
+    contain: layout style paint;
+    will-change: transform;
+}
+
+/* 表格容器优化 */
+.table-section {
+    contain: layout style paint;
 }

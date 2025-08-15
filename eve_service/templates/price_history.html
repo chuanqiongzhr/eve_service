@@ -7,24 +7,88 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <script src="{{ url_for('static', filename='js/echarts.min.js', v='1.0') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v='1.0') }}">
+    <style>
+        /* 下拉菜单样式 */
+        #dropdown-menu {
+            display: none;
+            position: fixed;
+            background-color: white;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 9999;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        #dropdown-menu a {
+            color: #333;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+        }
+        
+        #dropdown-menu a:hover {
+            background-color: #f1f1f1;
+            color: #1976d2;
+        }
+        
+        /* 夜间模式样式 */
+        [data-theme="dark"] #dropdown-menu {
+            background-color: #333;
+        }
+        
+        [data-theme="dark"] #dropdown-menu a {
+            color: #e0e0e0;
+        }
+        
+        [data-theme="dark"] #dropdown-menu a:hover {
+            background-color: #444;
+            color: #64b5f6;
+        }
+        
+        /* 用户名按钮样式 */
+        .user-btn {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-btn:after {
+            content: "▼";
+            font-size: 0.7em;
+            margin-left: 5px;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="navbar-container">
-            <a href="/" class="navbar-brand">EVE 工具集</a>
             <div class="navbar-menu">
+                <a href="/" class="navbar-brand">EVE 工具集</a>
                 <a href="/price_history" class="navbar-item">价格查询</a>
                 <a href="/xuexi_ranshao" class="navbar-item">血袭燃烧</a>
+            </div>
+            <div class="navbar-menu">
                 <!-- EVE SSO 认证按钮 -->
                 {% if session.get('eve_character_name') %}
-                    <span class="navbar-item">{{ session.get('eve_character_name') }}</span>
-                    <a href="/auth/logout" class="navbar-item">退出</a>
+                    <span class="navbar-item user-btn" id="user-btn">{{ session.get('eve_character_name') }}</span>
                 {% else %}
                     <a href="/auth/login" class="navbar-item">EVE SSO 登录</a>
                 {% endif %}
+                <!-- 主题切换按钮 -->
+                <button class="navbar-item theme-btn" onclick="toggleTheme()" title="切换夜间模式">
+                    <span id="theme-icon">🌙</span>
+                </button>
             </div>
         </div>
     </nav>
+
+    <!-- 将下拉菜单移到body的直接子元素，完全脱离导航栏 -->
+    {% if session.get('eve_character_name') %}
+    <div id="dropdown-menu">
+        <a href="/auth/logout">退出</a>
+    </div>
+    {% endif %}
 
     <div class="search-container">
         <input type="text" id="searchInput" class="search-input" placeholder="输入物品名称...">
@@ -44,8 +108,76 @@
         </div>
     </div>
 
+    <!-- 删除这里的悬浮夜间模式切换按钮 -->
+    <!-- <button class="theme-toggle" onclick="toggleTheme()" title="切换夜间模式">
+        <span id="theme-icon">🌙</span>
+    </button> -->
+
     <script src="{{ url_for('static', filename='js/api.js', v='1.0') }}"></script>
     <script src="{{ url_for('static', filename='js/chart.js', v='1.0') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js', v='1.0') }}"></script>
+    
+    <script>
+        // 夜间模式切换功能
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            const currentTheme = body.getAttribute('data-theme');
+            
+            if (currentTheme === 'dark') {
+                body.removeAttribute('data-theme');
+                themeIcon.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                themeIcon.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // 页面加载时应用保存的主题
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. 立即应用主题，避免闪烁
+            const savedTheme = localStorage.getItem('theme');
+            const themeIcon = document.getElementById('theme-icon');
+            
+            if (savedTheme === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                themeIcon.textContent = '☀️';
+            } else {
+                themeIcon.textContent = '🌙';
+            }
+            
+            // 2. 异步初始化图表（不阻塞UI）
+            setTimeout(() => {
+                initChart();
+                loadChart(); // 默认加载伊甸币数据
+            }, 0);
+            
+            // 下拉菜单功能
+            const userBtn = document.getElementById('user-btn');
+            const dropdownMenu = document.getElementById('dropdown-menu');
+            
+            if (userBtn && dropdownMenu) {
+                // 点击用户名按钮时显示/隐藏下拉菜单
+                userBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    
+                    // 获取按钮位置
+                    const rect = userBtn.getBoundingClientRect();
+                    
+                    // 设置下拉菜单位置
+                    dropdownMenu.style.top = (rect.bottom + window.scrollY) + 'px';
+                    dropdownMenu.style.left = (rect.left + window.scrollX) + 'px';
+                    dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+                });
+                
+                // 点击页面其他地方关闭下拉菜单
+                document.addEventListener('click', function() {
+                    dropdownMenu.style.display = 'none';
+                });
+            }
+        });
+    </script>
 </body>
 </html>

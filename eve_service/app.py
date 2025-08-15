@@ -448,10 +448,27 @@ def get_blood_cooperatives_data():
             try:
                 if eve_token_expires:
                     expires_time = datetime.fromisoformat(eve_token_expires)
-                    if datetime.now() >= expires_time:
-                        app.logger.warning('⏰ EVE SSO令牌已过期')
-                        eve_data_result = {'success': False, 'message': 'EVE SSO令牌已过期，请重新登录'}
-                    else:
+                    now = datetime.now()
+                    
+                    # 🔧 修复：在调用ESI API前检查并刷新token
+                    if (expires_time - now).total_seconds() < 300:  # 如果token在5分钟内过期
+                        app.logger.info('🔄 Token即将过期，尝试刷新')
+                        refresh_success = refresh_eve_token()
+                        if not refresh_success:
+                            app.logger.error('❌ Token刷新失败')
+                            eve_data_result = {'success': False, 'message': 'EVE SSO token已过期且刷新失败，请重新登录EVE SSO'}
+                            # 清除过期的session数据
+                            eve_keys = ['eve_access_token', 'eve_refresh_token', 'eve_character_id', 
+                                       'eve_character_name', 'eve_token_expires']
+                            for key in eve_keys:
+                                session.pop(key, None)
+                        else:
+                            app.logger.info('✅ EVE SSO令牌刷新成功，继续获取数据')
+                            # 更新token信息
+                            eve_access_token = session.get('eve_access_token')
+                    
+                    # 如果token有效或刷新成功，继续获取数据
+                    if eve_access_token and (datetime.now() < datetime.fromisoformat(session.get('eve_token_expires', '1970-01-01'))):
                         # 令牌有效，获取EVE数据
                         app.logger.info(f'🚀 开始获取EVE SSO数据，角色ID: {eve_character_id}')
                         
@@ -460,7 +477,22 @@ def get_blood_cooperatives_data():
 
                         eve_data = get_eve_character_data(eve_character_id, eve_access_token)
 
-                        if eve_data:
+                        # 🔧 修复：处理token过期错误
+                        if isinstance(eve_data, dict) and eve_data.get('error') == 'token_expired':
+                            app.logger.warning('🔄 检测到token过期，尝试刷新')
+                            refresh_success = refresh_eve_token()
+                            if refresh_success:
+                                # 重新尝试获取数据
+                                eve_data = get_eve_character_data(eve_character_id, session['eve_access_token'])
+                            else:
+                                eve_data_result = {'success': False, 'message': 'EVE SSO token已过期且刷新失败，请重新登录EVE SSO'}
+                                # 清除过期的session数据
+                                eve_keys = ['eve_access_token', 'eve_refresh_token', 'eve_character_id', 
+                                           'eve_character_name', 'eve_token_expires']
+                                for key in eve_keys:
+                                    session.pop(key, None)
+
+                        if eve_data and not (isinstance(eve_data, dict) and eve_data.get('error')):
                             eve_save_success, eve_save_message = save_eve_character_data_to_db(
                                 user_info['id'], 
                                 eve_character_id, 
@@ -478,17 +510,6 @@ def get_blood_cooperatives_data():
                             else:
                                 app.logger.error(f'❌ EVE SSO数据保存失败: {eve_save_message}')
                                 eve_data_result = {'success': False, 'message': f'EVE SSO数据保存失败: {eve_save_message}'}
-                            
-                            if eve_save_success:
-                                app.logger.info('✅ EVE SSO数据获取并保存成功')
-                                eve_data_result = {
-                                    'success': True, 
-                                    'message': 'EVE SSO数据更新成功',
-                                    'data': eve_data
-                                }
-                            else:
-                                app.logger.error('❌ EVE SSO数据保存失败')
-                                eve_data_result = {'success': False, 'message': 'EVE SSO数据保存失败'}
                         else:
                             app.logger.warning('⚠️ EVE SSO数据获取失败')
                             eve_data_result = {'success': False, 'message': 'EVE SSO数据获取失败'}
@@ -737,6 +758,106 @@ def get_recent_wallet_donations_api():
             'message': str(e)
         }), 500
 
+@app.route('/api/wallet_incremental_update', methods=['POST'])
+def wallet_incremental_update_api():
+    """钱包增量更新API"""
+    try:
+        # 验证会话
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({
+                'success': False,
+                'message': '未找到会话ID，请重新登录'
+            }), 401
+        
+        user_info = user_manager.validate_session(session_id)
+        if not user_info:
+            session.clear()
+            return jsonify({
+                'success': False,
+                'message': '会话已过期，请重新登录'
+            }), 401
+        
+        # 获取请求数据
+        data = request.get_json() or {}
+        force_refresh = data.get('force_refresh', False)
+        
+        # 🔧 修复：从Flask session中获取EVE角色信息
+        character_id = session.get('eve_character_id')
+        access_token = session.get('eve_access_token')
+        character_name = session.get('eve_character_name', 'Unknown')
+        
+        if not character_id or not access_token:
+            return jsonify({
+                'success': False,
+                'message': 'EVE角色信息不完整，请先进行EVE SSO登录'
+            }), 400
+        
+        # 检查token是否过期
+        eve_token_expires = session.get('eve_token_expires')
+        if eve_token_expires:
+            expires_time = datetime.fromisoformat(eve_token_expires)
+            if datetime.now() >= expires_time:
+                return jsonify({
+                    'success': False,
+                    'message': 'EVE SSO token已过期，请刷新token',
+                    'error_type': 'token_expired'
+                }), 401
+        
+        # 准备ESI请求头
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json',
+            'User-Agent': 'EVE Service Wallet Updater'
+        }
+        
+        # 调用增量更新函数
+        from eve_service.scripts.get_blood_lp import get_wallet_journal_incremental, save_eve_character_data_to_db
+        
+        try:
+            wallet_journal = get_wallet_journal_incremental(character_id, headers, force_refresh)
+        except Exception as e:
+            if 'token_expired' in str(e):
+                return jsonify({
+                    'success': False,
+                    'message': 'EVE SSO token已过期，请刷新token',
+                    'error_type': 'token_expired'
+                }), 401
+            else:
+                raise e
+        
+        # 保存到数据库
+        if wallet_journal:
+            eve_data = {'wallet_journal': wallet_journal}
+            user_id = user_info.get('id')  # 🔧 修复：使用正确的字段名
+            
+            success, message = save_eve_character_data_to_db(user_id, character_id, character_name, eve_data)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'增量更新成功，获取到 {len(wallet_journal)} 条新记录',
+                    'new_entries': len(wallet_journal)
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'数据保存失败: {message}'
+                }), 500
+        else:
+            return jsonify({
+                'success': True,
+                'message': '没有新的钱包记录',
+                'new_entries': 0
+            })
+        
+    except Exception as e:
+        app.logger.error(f'钱包增量更新异常: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'服务器内部错误: {str(e)}'
+        }), 500
+
 @app.route('/api/mission_status_summary')
 def get_mission_status_summary_api():
     """获取任务状态统计信息API"""
@@ -771,6 +892,159 @@ def get_mission_status_summary_api():
         return jsonify({
             'success': False,
             'message': f'服务器内部错误: {str(e)}'
+        }), 500
+
+@app.route('/api/mark_missions_done', methods=['POST'])
+def mark_missions_done():
+    """标记任务完成的代理API"""
+    try:
+        # 验证会话
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({
+                'success': False,
+                'message': '未找到会话ID，请重新登录'
+            }), 401
+        
+        user_info = user_manager.validate_session(session_id)
+        if not user_info:
+            return jsonify({
+                'success': False,
+                'message': '会话已过期，请重新登录'
+            }), 401
+        
+        # 获取请求数据
+        data = request.get_json()
+        mission_ids = data.get('mission_ids', [])
+        
+        if not mission_ids:
+            return jsonify({
+                'success': False,
+                'message': '没有提供任务ID'
+            }), 400
+        
+        # 这里需要获取用户的血袭合作社凭据
+        # 你可能需要从数据库或其他地方获取
+        # 暂时使用硬编码，实际应该从安全存储中获取
+        blood_username = "your_username"  # 需要替换
+        blood_password = "your_password"  # 需要替换
+        
+        # 获取token
+        login_url = "https://bloodapi.cs-eve.com/api/tokens"
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic Y2h1YW5xaW9uZzp6aHIxNTMwMDQzNjAy',
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        token_data = {
+            "username": blood_username,
+            "password": blood_password
+        }
+        
+        token_response = requests.post(login_url, headers=headers, json=token_data)
+        if not token_response.ok:
+            return jsonify({
+                'success': False,
+                'message': '获取token失败'
+            }), 400
+        
+        token_result = token_response.json()
+        access_token = token_result.get('access_token')
+        
+        # 标记任务完成
+        results = []
+        headers_with_token = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        for mission_id in mission_ids:
+            try:
+                done_url = f"https://bloodapi.cs-eve.com/api/missions/{mission_id}/done"
+                done_response = requests.post(done_url, headers=headers_with_token)
+                
+                if done_response.ok:
+                    results.append({'mission_id': mission_id, 'status': 'success'})
+                else:
+                    results.append({
+                        'mission_id': mission_id, 
+                        'status': 'failed', 
+                        'error': done_response.text
+                    })
+            except Exception as e:
+                results.append({
+                    'mission_id': mission_id, 
+                    'status': 'error', 
+                    'error': str(e)
+                })
+        
+        # 1. 从数据库中删除已支付任务汇总中的相应条目
+        try:
+            from eve_service.scripts.get_blood_lp import get_paid_missions_summary
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            db_path = os.path.join(os.path.dirname(current_dir), 'scripts', 'eve_data.db')
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # 删除已支付任务中的相应条目
+            for mission_id in mission_ids:
+                cursor.execute('''
+                    DELETE FROM blood_cooperative_data 
+                    WHERE status = 'paid' AND mission_id = ?
+                ''', (mission_id,))
+            
+            conn.commit()
+            app.logger.info(f'✅ 成功从数据库中删除 {len(mission_ids)} 条已支付任务记录')
+            
+        except Exception as db_error:
+            app.logger.error(f'❌ 删除已支付任务记录失败: {str(db_error)}')
+        finally:
+            if conn:
+                conn.close()
+        
+        # 2. 触发从学习合作社获取新数据的更新
+        try:
+            from eve_service.scripts.get_blood_lp import collect_publisher_data, get_blood_cooperatives_task_data
+            
+            # 获取最新的合作社数据
+            app.logger.info(f'📡 开始获取最新合作社数据，用户: {blood_username}')
+            cooperatives_response = get_blood_cooperatives_task_data(blood_username, blood_password)
+            
+            # 从返回的完整数据中提取任务列表
+            cooperatives_data = cooperatives_response.get('data', []) if cooperatives_response else []
+            
+            if cooperatives_data:
+                # 将血袭合作社数据保存到数据库
+                save_success, save_message = save_blood_data_to_db(
+                    user_info['id'], 
+                    user_info['username'], 
+                    cooperatives_data
+                )
+                app.logger.info(f'💾 血袭合作社数据更新结果: {save_success}, 消息: {save_message}')
+                
+                # 收集发布者数据
+                publisher_success, publisher_message = collect_publisher_data(blood_username, blood_password)
+                app.logger.info(f'💾 发布者数据更新结果: {publisher_success}, 消息: {publisher_message}')
+            else:
+                app.logger.warning('⚠️ 获取合作社数据失败或数据为空')
+                
+        except Exception as update_error:
+            app.logger.error(f'❌ 更新合作社数据失败: {str(update_error)}')
+        
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+        
+    except Exception as e:
+        app.logger.error(f'标记任务完成异常: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'服务器错误: {str(e)}'
         }), 500
         
 # 在 get_mission_status_summary_api 路由之后，if __name__ == "__main__": 之前添加以下代码：
@@ -946,7 +1220,7 @@ def get_character_info(access_token):
 
 
 def refresh_eve_token():
-    """刷新EVE SSO访问令牌"""
+    """改进的EVE SSO访问令牌刷新机制"""
     try:
         if 'eve_refresh_token' not in session:
             app.logger.warning('没有refresh_token，无法刷新令牌')
@@ -980,16 +1254,23 @@ def refresh_eve_token():
             
             # 更新session中的令牌信息
             session['eve_access_token'] = token_data['access_token']
+            
+            # 🆕 处理refresh token轮换
             if 'refresh_token' in token_data:
                 session['eve_refresh_token'] = token_data['refresh_token']
+                app.logger.info('✅ Refresh token已更新（支持token轮换）')
             
-            # 延长令牌过期时间 - 这里是关键改进
+            # 🆕 智能过期时间计算
             expires_in = token_data.get('expires_in', 1200)
-            # 可以选择延长过期时间，比如设置为更长的时间
-            extended_expires_in = max(expires_in, 3600)  # 至少1小时
-            session['eve_token_expires'] = (datetime.now() + timedelta(seconds=extended_expires_in)).isoformat()
+            # 提前5分钟刷新，避免边界情况
+            safe_expires_in = max(expires_in - 300, 300)
+            session['eve_token_expires'] = (datetime.now() + timedelta(seconds=safe_expires_in)).isoformat()
             
-            app.logger.info(f'✅ EVE SSO令牌刷新成功，延长至{extended_expires_in}秒后过期')
+            # 🆕 记录token版本信息
+            session['eve_token_version'] = 'v2'
+            session['eve_token_last_refresh'] = datetime.now().isoformat()
+            
+            app.logger.info(f'✅ EVE SSO令牌刷新成功，{safe_expires_in}秒后过期')
             return True
         else:
             app.logger.error(f'❌ 令牌刷新失败: {response.status_code} - {response.text}')
@@ -998,6 +1279,33 @@ def refresh_eve_token():
     except Exception as e:
         app.logger.error(f'❌ 令牌刷新异常: {str(e)}')
         return False
+
+@app.route('/auth/refresh', methods=['POST'])
+def refresh_token_api():
+    """刷新EVE SSO令牌的API端点"""
+    try:
+        if refresh_eve_token():
+            return jsonify({
+                'success': True,
+                'message': 'Token刷新成功',
+                'token_info': {
+                    'character_id': session.get('eve_character_id'),
+                    'character_name': session.get('eve_character_name'),
+                    'token_expires': session.get('eve_token_expires'),
+                    'has_access_token': bool(session.get('eve_access_token'))
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Token刷新失败，请重新登录'
+            }), 401
+    except Exception as e:
+        app.logger.error(f'Token刷新API异常: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'Token刷新失败: {str(e)}'
+        }), 500
 
 @app.before_request
 def check_eve_token():
